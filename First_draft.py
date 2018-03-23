@@ -13,25 +13,30 @@ global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p
 
 
 def are_you_my_mom():
+	# TODO - make the speech recognition work (get the heard word)
 	speech_rec_p.setVocabulary(["yes", "no"], True)
 	speech_rec_p.subscribe("Test_ASR")
 	time.sleep(3)
 	speech_rec_p.unsubscribe("Test_ASR")
 	if "yes" in memory_p.getData("Test_ASR"):
+		#returning True BREAKS the while loop
 		return True
+	
 	return False
 	
 	
 def face_detection():
 	period = 500
-	face_det_p.subscribe("Test_Face", period, 0.0 )
+	face_det_p.subscribe("Test_Face", period, 0.0)
 	for i in range(0, 5):
 		time.sleep(0.5)
 		val = memory_p.getData("FaceDetected")
 		# Check whether we got a valid output.
 		if(val and isinstance(val, list) and len(val) >= 2):
-			tts_p.say("E?")
+			# a face is detected
+			tts_p.say("Are you my mom?")
 			if are_you_my_mom():
+				# BREAKS the while loop
 				return False 
 		return True
 	
@@ -57,14 +62,12 @@ try:
 		angle_list = [list(np.random.uniform(-0.8, 0.8, 1)), list(np.random.uniform(-0.6, 0.6, 1))]
 		times = [[1.25],[1.25]]
 
-		motion_p.angleInterpolation(joint_list, angle_list, times, False)
-	
-	
+		# if False: the angles are added to the current position, else they are calculated relative to the origin
+		motion_p.angleInterpolation(joint_list, angle_list, times, False) 
 	
 	posture_p.goToPosture("Sit", 0.5)
 	motion_p.rest()
 	broker.shutdown()
 except Exception, e:
 	print("Error", str(e))
-	motion_p.rest()
 	sys.exit(0)
