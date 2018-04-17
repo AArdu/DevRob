@@ -1,0 +1,8 @@
+Color boudaries : Bram
+E-mail tasks : Bram
+
+RBF 2d : Saskia
+
+Capture, recognize circles and colors : Alessandro
+
+OLS : later
