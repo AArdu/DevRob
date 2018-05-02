@@ -15,31 +15,34 @@ class WitAi(ALModule):
 		try:
 			ALModule.__init__(self, name)
 			self.ALAudioDevice = ALProxy("ALAudioDevice")
+			self.ALAudioRecorder = ALProxy("ALAudioRecorder")
 			self.AudioPlayer = ALProxy("ALAudioPlayer")
 		except Exception, e:
 			print("Error while creating audio proxies:", e)
 			sys.exit(0)
 
-		self.saveFile = wave.open('test.wav', 'wb')
-		channels = [0, 1, 0, 0]
-		self.ALAudioDevice.setClientPreferences(self.getName(), 48000, channels, 0, 0)
-
+		self.saveFile = StringIO.StringIO() # wave.open('test.wav', 'wb')
+		self.channels = [1, 0, 0, 0]
+		self.ALAudioDevice.setClientPreferences(self.getName(), 48000, self.channels, 0, 0)
 
 	def processRemote(self, inputBuff):
+		self.ALAudioDevice.process()
 		self.saveFile.write(inputBuff)
 
 	def startWit(self):
 		self.headers = {'Authorization':'Bearer 3AHM4NJZN4X5EBLG2AZXTTRG7U67AIU2'}
-		self.headers['Content-Type'] = "audio/raw;encoding=signed_integer;bits=16;rate=48000;endian=little"
+		self.headers['Content-Type'] = "audio/raw;encoding=unsigned-integer;bits=16;rate=48000;endian=little"
 
 	def startAudioTest(self, duration=3):
 		self.startWit()
-		self.ALAudioDevice.subscribe(self.getName())
 		self.AudioPlayer.play(self.AudioPlayer.loadFile("/usr/share/naoqi/wav/begin_reco.wav"))
+		self.ALAudioRecorder.startMicrophonesRecording("./test.wav", "wav", 16000, self.channels)
+		# self.ALAudioDevice.subscribe(self.getName())
 		time.sleep(duration)
-		self.ALAudioDevice.unsubscribe(self.getName())
+		# self.ALAudioDevice.unsubscribe(self.getName())
+		self.ALAudioRecorder.stopMicrophonesRecording()
 		self.AudioPlayer.play(self.AudioPlayer.loadFile("/usr/share/naoqi/wav/end_reco.wav"))
-		self.startUpload(self.saveFile)
+		self.startUpload(wave.open('test.wav', 'rb'))
 
 	def startUpload(self, datafile):
 		conn = httplib.HTTPSConnection("api.wit.ai")
@@ -47,19 +50,22 @@ class WitAi(ALModule):
 		response = conn.getresponse()
 		data = response.read()
 		self.reply = data
-	 	print data
+	 	print "*** Response data: *** \n" + data
 
 	def listenNow(self, duration):
 		it = 0
 		while  it < 3:
 			self.startAudioTest(duration)
-			response = json.loads(self.reply)
-			print("#"*30 + "\n" + response)
-			if response["outcomes"][0]["confidence"] > 0.6:
-				return response["outcomes"][0]["_text"]
+			re = self.reply
+			response = json.loads(re)
+			if "error" not in response:
+				if response["outcomes"][0]["confidence"] > 0.6:
+					return response["outcomes"][0]["_text"]
+				else:
+					tts_p.say("Sorry, I did not understand what you said. Could you please repeat?")
+					it += 1
 			else:
-				tts_p.say("Sorry, I did not understand what you said. Could you please repeat?")
-				it += 1
+				print("Error while connecting to Wit.ai: Bad request")
 		return None
 
 def are_you_my_mom():
@@ -90,6 +96,7 @@ def learnFace():
 	pass
 
 def center_face():
+	print "center_face"
 	val = memory_p.getData("FaceDetected")
 	ShapeInfo = val[1][0][0]
 	alpha, beta = ShapeInfo[1:2]
@@ -285,8 +292,8 @@ if __name__ == "__main__":
 		posture_p.goToPosture("Sit", 0.7)
 		motion_p.rest()
 		broker.shutdown()
-	except Exception, e:
-		print("Error", e)
+	except Exception , e:
+		print("Error in __main__" + e)
 		posture_p.goToPosture("Sit", 0.7)
 		motion_p.rest()
 		broker.shutdown()
