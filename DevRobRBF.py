@@ -72,14 +72,18 @@ output = eng.sim(network, input, nargout = nrDimensions)
 
 
 def reach(target, stepsize, mu, spead, w, nrHidden):
-    # TODO: get initial position of joints of NAO.
-    jointVector= (0,0,0,0,0,0 )# this should be the initial position of the joints
+    # Check if the object is on the left or right from the core of the body.
+
+    
+    # jointList = [LShoulderPitch, LShoulderRoll, LElbowYaw, LElbowRoll]
+    # motion_p.getAngles(jointList)
+    jointVector= (0.1,0.2,0.1,0.3) # this should be the initial position of the joints
     location = useRBF(jointVector, w, mu, spread, nrHidden)     # current location of the hand
     counter  = 0    # counts how many movement steps are made
     alfa = 0  
-    
+
     # move till correct location is reached or 25 movements are made 
-    while(alfa != 1 & counter <= 25):
+    while(alfa != 1 and counter <= 25):
         counter += 1
         if(euclidean(target, location)> stepsize):
             alfa = stepsize/euclidean(target, location)
@@ -89,8 +93,10 @@ def reach(target, stepsize, mu, spead, w, nrHidden):
         jacobian = calculateJacobian(DOF, nrHidden, jointVector, mu, spread)
         invJacobian = pinv(jacobian)
         difLocation = alfa*(target-location)
-        jointVector = jointVector + invJacobian*difLocation
+        jointVector = jointVector + np.dot(difLocation,invJacobian)
         # TODO: move the NAO
+        jointVector = jointVector[0,:]
+        print jointVector
         location = useRBF(jointVector, w, mu, spread, nrHidden)  
         
         
@@ -110,3 +116,5 @@ def calculateJacobian(DOF, nrHidden, jointVector, mu, spread):
 
 [mu, spread, w] = TrainRBF(nrSimulations, nrHidden, testInput, testOutput)
 outputRBF = useRBF(np.random.rand(4), w, mu, spread, nrHidden)
+reach((50,100), stepsize, mu, spread, w, nrHidden)
+
