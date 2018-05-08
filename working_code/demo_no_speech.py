@@ -2,6 +2,7 @@ import naoqi
 from naoqi import ALProxy, ALModule, ALBroker
 import numpy as np
 import cv2, time, sys, StringIO, json, httplib, wave, pprint
+import random
 
 
 nao_ip = "192.168.1.137"
@@ -9,6 +10,51 @@ nao_port = 9559
 
 global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
 
+
+class SpeechRecognition(ALModule):
+    def __init__(self, name):
+        try:
+            p = ALProxy(name)
+            p.exit()
+        except:
+            pass
+        ALModule.__init__(self,name)
+        self.response = False
+        self.value = []
+        self.name = name
+        self.spr = ALProxy("ALSpeechRecognition")
+        self.spr.pause(True)
+
+
+    def getSpeech(self, wordlist, wordspotting):
+        self.response = False
+        self.value = []
+        self.spr.setVocabulary(wordlist, wordspotting)
+        self.spr.pause(False)
+        memory_p.subscribeToEvent("WordRecognized", self.name, "onDetect")
+
+    def onDetect(self, keyname, value, subsriber_name):
+        self.response = True
+        self.value = value
+        print value
+        memory_.unsubscribeToEvent("WordRecognized", self.name)
+        self.spr.pause(True)
+
+        if "abort" in self.value[0]:
+            self.response = False
+            memory_p.unsubscribeToEvent("WordRecognized", Speecher.name)
+            sys.exit(0)
+            return
+
+def areyoumymom(Speecher):
+	tts_p.say("Its'a me, Marvin")
+	Speecher.getSpeech(["yes", "no", "abort"], True)
+	if "yes" in Speecher.value[0]:
+		# Speecher.getSpeech(["yes", "no", "abort"], True)
+		memory_p.unsubscribeToEvent("WordRecognized", Speecher.name)
+		return True
+
+	return False
 
 def face_detection():
 	period = 500
@@ -33,9 +79,9 @@ def center_face(face):
 	Moves the head so that the first face
 	on the list is at the center of the visual field
 	"""
-	pp = pprint.PrettyPrinter(indent=4)
-	print(len(face))
-	pp.pprint(face)
+	# pp = pprint.PrettyPrinter(indent=4)
+	# print(len(face))
+	# pp.pprint(face)
 	ShapeInfo = face[1][0][0]
 	cameraTorso = face[2]
 	alpha = ShapeInfo[1]
@@ -64,7 +110,7 @@ def get_joint_pos(chainName = "LArm", frame = "robot"):
 def connect_new_cam(
 	cam_name = "TeamPiagetsCam",
 	cam_type = 0, # 0 is the upper one
-	res = 1, # resolution
+	res = 2, # resolution
 	colspace = 13, # BGR
 	fps = 10 # frames per second
 	):
@@ -137,12 +183,12 @@ def get_colored_circle(img, l_thr, u_thr):
 
 	else:
 		cv2.imshow("Detected circles", out_img)
-		cv2.waitKey()
+		cv2.waitKey(1)
 		return None
 
 
 	cv2.imshow("Detected circles", out_img)
-	cv2.waitKey()
+	cv2.waitKey(1)
 	return circ_dict
 
 
@@ -185,7 +231,18 @@ def find_circles(cam):
 
 	return detected_circles
 
+def pointRandom():
+	# motionProxy = ALProxy('ALMotion')
+	armJoints = [('HeadYaw', -2.0857, 0),
+             ('HeadPitch', -0.330041, 0.200015),
+             ('RShoulderRoll', -1.3265, 0.3142),
+             ('RShoulderPitch', -2.0857, 2.0857)]
 
+	for joint in armJoints:
+		angle = random.uniform(joint[1], joint[2])
+		motion_p.setAngles(joint[0], angle, 0.1)
+		# self.logger.info('Setting {} to {}'.format(joint[0], angle))
+		pass
 
 
 if __name__ == "__main__":
@@ -207,9 +264,12 @@ if __name__ == "__main__":
 			sys.exit(0)
 
 		motion_p.wakeUp()
+		Speecher = SpeechRecognition("Speecher")
 		while True:
 			faceInfo = face_detection()
 			if faceInfo is not None:
+				center_face(faceInfo)
+				# if areyoumymom(Speecher):
 				break
 			# move head around until face is detected
 			time.sleep(0.5)
@@ -220,17 +280,21 @@ if __name__ == "__main__":
 			# if False: the angles are added to the current position, else they are calculated relative to the origin
 			motion_p.angleInterpolation(joint_list, angle_list, times, True)
 
-		center_face(faceInfo)
 
 		# TODO - define these methods
 		learnFace(faceInfo)
 		follow_gaze()
 
 		cam = connect_new_cam()
+
+		while True:
+			pointRandom()
+			image = get_remote_image(cam)
+
+
 		circles = find_circles(cam)
 		pp = pprint.PrettyPrinter(indent=4)
 		pp.pprint(circles)
-
 
 		posture_p.goToPosture("Sit", 0.7)
 		motion_p.rest()
