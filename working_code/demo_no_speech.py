@@ -51,16 +51,17 @@ class FaceDetector:
     """
     Class to detect faces in picture.
     """
-	def __init__(self, img="face.jpg", debug=False):
-		self.face_cascade = cv.CascadeClassifier('/all_data/haarcascade_frontalface_default.xml')
-		self.eye_cascade = cv.CascadeClassifier('/all_data/haarcascade_eye.xml')
-		self.loadIm(img)
+    def __init__(self, img="face.jpg", debug=False):
+    	self.face_cascade = cv2.CascadeClassifier('./all_data/haarcascade_frontalface_default.xml')
+    	self.eye_cascade = cv2.CascadeClassifier('./all_data/haarcascade_eye.xml')
+        self.loadIm(img)
         if debug:
-    		self.drawFaceBoxes(self.img)
-    		self.drawEyeBoxes(self.img)
-    		self.showIm()
+            self.drawFaceBoxes()
+            self.drawCenterFaces()
+            self.drawEyeBoxes()
+            self.showIm()
 
-	def detectFaces(self, img):
+    def detectFaces(self):
         """
         Detects faces in an image.
         Input:
@@ -68,14 +69,28 @@ class FaceDetector:
         Output:
         faces = [(topLeft_x, topLeft_y, width, height)] List of quadrupples that describe a box around the faces that were detected.
         """
-		faces = self.face_cascade.detectMultiScale(self.gray, 1.3, 5)
-		return faces
+    	faces = self.face_cascade.detectMultiScale(self.gray, 1.3, 5)
+    	return faces
 
-	def drawFaceBoxes(self, img):
-		for (x, y, w, h) in self.detectFaces(img):
-			cv.rectangle(self.img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+    def drawFaceBoxes(self):
+    	for (x, y, w, h) in self.detectFaces():
+    		cv2.rectangle(self.img, (x, y), (x+w, y+h), (255, 0, 0), 2)
 
-	def detectEyes(self, img):
+    def detectCenterFaces(self):
+        centers = []
+        height, width, channels = self.img.shape
+        for (x, y, w, h) in self.detectFaces():
+            centers.append(((x + float(w)/2)/width, (y + float(h)/2)/height))
+        print centers
+        return centers
+
+    def drawCenterFaces(self):
+        height, width, channels = self.img.shape
+        for (x, y) in self.detectCenterFaces():
+            cv2.line(self.img, (int(x*width)-5, int(y*height)), (int(x*width)+5, int(y*height)), (255,0,0))
+            cv2.line(self.img, (int(x*width), int(y*height)-5), (int(x*width), int(y*height)+5), (255,0,0))
+
+    def detectEyes(self):
         """
         Detects eyes in an image.
         Input:
@@ -83,26 +98,29 @@ class FaceDetector:
         Output:
         eyes = [(topLeft_x, topLeft_y, width, height)] List of quadrupples that describe a box around the eyes that were detected.
         """
-		for (x, y, w, h) in self.detectFaces(img):
-			roi_gray = self.gray[y:y+h, x:x+w]
-			roi_color = self.img[y:y+h, x:x+w]
-			eyes = self.eye_cascade.detectMultiScale(roi_gray)
-		return eyes
+    	for (x, y, w, h) in self.detectFaces():
+    		roi_gray = self.gray[y:y+h, x:x+w]
+    		roi_color = self.img[y:y+h, x:x+w]
+    		eyes = self.eye_cascade.detectMultiScale(roi_gray)
+    	return eyes
 
-	def drawEyeBoxes(self, img):
-		for (x, y, w, h) in self.detectFaces(img):
-			for (ex, ey, ew, eh) in self.detectEyes(img):
-				roi_color = self.img[y:y+h, x:x+w]
-				cv.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (0, 255, 0), 2)
+    def drawEyeBoxes(self):
+    	for (x, y, w, h) in self.detectFaces():
+    		for (ex, ey, ew, eh) in self.detectEyes():
+    			roi_color = self.img[y:y+h, x:x+w]
+    			cv2.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (0, 255, 0), 2)
 
     def loadIm(self, img):
-        self.img = cv.imread(img)
-        self.gray = cv.cvtColor(self.img, cv.COLOR_BGR2GRAY)
+        if isinstance(img, str):
+            self.img = cv2.imread(img)
+        else:
+            self.img = img
+        self.gray = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
 
-	def showIm(self):
-		cv.imshow('img', self.img)
-		cv.waitKey(0)
-		cv.destroyAllWindows()
+    def showIm(self):
+    	cv2.imshow('img', self.img)
+    	cv2.waitKey(0)
+    	cv2.destroyAllWindows()
 
 def areyoumymom(Speecher):
 	tts_p.say("Its'a me, Marvin")
@@ -148,14 +166,16 @@ def center_face(face):
 	motion_p.angleInterpolation(["HeadYaw","HeadPitch"], [alpha, beta], [1.5, 1.5], False)
 
 
-def follow_gaze(face_coor):
-	with open('coor_face.txt') as fc:
-		fc.write(fc)
-	pass
-
-
-
-
+def follow_gaze():
+    #with open('coor_face.txt') as fc:
+    #	fc.write(fc)
+    #pass
+    cam = connect_new_cam()
+    img = get_remote_image(cam)
+    FaceDetector(img, True)
+    #e = FaceDetector.detectCenterFaces()
+    #FaceDetector.drawCenterFaces()
+    #FaceDetector.showIm()
 
 
 def get_joint_pos(chainName = "LArm", frame = "robot"):
@@ -346,21 +366,22 @@ if __name__ == "__main__":
         	# if False: the angles are added to the current position, else they are calculated relative to the origin
         	motion_p.angleInterpolation(joint_list, angle_list, times, True)
 
-
-        # TODO - define these methods
-        learnFace(faceInfo)
         follow_gaze()
+        # TODO - define these methods
+        if False:
+            learnFace(faceInfo)
+            follow_gaze()
 
-        cam = connect_new_cam()
+            cam = connect_new_cam()
 
-        while True:
-        	pointRandom()
-        	image = get_remote_image(cam)
+            while True:
+            	pointRandom()
+            	image = get_remote_image(cam)
 
 
-        circles = find_circles(cam)
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(circles)
+            circles = find_circles(cam)
+            pp = pprint.PrettyPrinter(indent=4)
+            pp.pprint(circles)
 
         posture_p.goToPosture("Sit", 0.7)
         motion_p.rest()
