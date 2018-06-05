@@ -15,7 +15,8 @@ import numpy as np
 import pandas as pd
 import scipy.io as sio
 from chainer import Chain, training
-from scipy.misc import imresize
+from skimage.transform import resize as imresize
+import chainer.serializers.npz as npz
 
 # we hebben nodig: data wat de foto is van 1x3x227x227
 #                   data foto van het hoofd: ook 1x3x227x227
@@ -90,6 +91,10 @@ class GazeNet(Chain):
         fc_0_m1 = self.fc_0_m1(fc_7)
 
         return fc_0_0, fc_1_0, fc_0_1, fc_0_m1, fc_m1_0
+
+    def loadWeights(self, npz_path):
+        npz.load_npz(npz_path, self)
+        return self
 
 class trainGazeNet():
     def __init__(self, model, batch_size = 128, input_shape = [227, 227], csv_path="./all_data/train_gaze_det/train_annotations.txt"):
