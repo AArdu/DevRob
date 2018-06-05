@@ -154,35 +154,6 @@ class trainGazeNet():
         eye_image_resize = eye_image_resize.transpose(3, 2, 0, 1)
         return input_image_resize, eye_image_resize
 
-    def fit_shape_of_inputs(img_resize, eye_image_resize):
-        """Fits the input for the forward pass."""
-        input_image_resize = img_resize.reshape([img_resize.shape[0], \
-                                                   img_resize.shape[1], \
-                                                   img_resize.shape[2], 1])
-        input_image_resize = input_image_resize.transpose(3, 2, 0, 1)
-
-        eye_image_resize = eye_image_resize.reshape([eye_image_resize.shape[0], \
-                                                    eye_image_resize.shape[1], \
-                                                    eye_image_resize.shape[2], 1])
-        eye_image_resize = eye_image_resize.transpose(3, 2, 0, 1)
-        return input_image_resize, eye_image_resize
-
-    def fit_shape_of_inputs(img_resize, eye_image_resize):
-        """From:
-        https://github.com/pieterwolfert/engagement-l2tor/blob/master/script/gaze_predict.py
-
-        Fits the input for the forward pass."""
-        input_image_resize = img_resize.reshape([img_resize.shape[0], \
-                                                   img_resize.shape[1], \
-                                                   img_resize.shape[2], 1])
-        input_image_resize = input_image_resize.transpose(3, 2, 0, 1)
-
-        eye_image_resize = eye_image_resize.reshape([eye_image_resize.shape[0], \
-                                                    eye_image_resize.shape[1], \
-                                                    eye_image_resize.shape[2], 1])
-        eye_image_resize = eye_image_resize.transpose(3, 2, 0, 1)
-        return input_image_resize, eye_image_resize
-
     def eyeGrid(img, headlocs):
         """From:
         https://github.com/pieterwolfert/engagement-l2tor/blob/master/script/gaze_predict.py
