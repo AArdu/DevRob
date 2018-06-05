@@ -3,12 +3,13 @@ from naoqi import ALProxy, ALModule, ALBroker
 import numpy as np
 import cv2, time, sys, StringIO, json, httplib, wave, pprint
 import random
+import subprocess
 
 
 nao_ip = "192.168.1.137"
 nao_port = 9559
 
-global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
+#motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p = None
 
 
 class SpeechRecognition(ALModule):
@@ -36,7 +37,7 @@ class SpeechRecognition(ALModule):
     def onDetect(self, keyname, value, subsriber_name):
         self.response = True
         self.value = value
-        print value
+        print(value)
         memory_.unsubscribeToEvent("WordRecognized", self.name)
         self.spr.pause(True)
 
@@ -45,6 +46,63 @@ class SpeechRecognition(ALModule):
             memory_p.unsubscribeToEvent("WordRecognized", Speecher.name)
             sys.exit(0)
             return
+
+class FaceDetector:
+    """
+    Class to detect faces in picture.
+    """
+	def __init__(self, img="face.jpg", debug=False):
+		self.face_cascade = cv.CascadeClassifier('/all_data/haarcascade_frontalface_default.xml')
+		self.eye_cascade = cv.CascadeClassifier('/all_data/haarcascade_eye.xml')
+		self.loadIm(img)
+        if debug:
+    		self.drawFaceBoxes(self.img)
+    		self.drawEyeBoxes(self.img)
+    		self.showIm()
+
+	def detectFaces(self, img):
+        """
+        Detects faces in an image.
+        Input:
+        img = cv.imread image Image in which you want to detect faces.
+        Output:
+        faces = [(topLeft_x, topLeft_y, width, height)] List of quadrupples that describe a box around the faces that were detected.
+        """
+		faces = self.face_cascade.detectMultiScale(self.gray, 1.3, 5)
+		return faces
+
+	def drawFaceBoxes(self, img):
+		for (x, y, w, h) in self.detectFaces(img):
+			cv.rectangle(self.img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+
+	def detectEyes(self, img):
+        """
+        Detects eyes in an image.
+        Input:
+        img = cv.imread image Image in which you want to detect faces.
+        Output:
+        eyes = [(topLeft_x, topLeft_y, width, height)] List of quadrupples that describe a box around the eyes that were detected.
+        """
+		for (x, y, w, h) in self.detectFaces(img):
+			roi_gray = self.gray[y:y+h, x:x+w]
+			roi_color = self.img[y:y+h, x:x+w]
+			eyes = self.eye_cascade.detectMultiScale(roi_gray)
+		return eyes
+
+	def drawEyeBoxes(self, img):
+		for (x, y, w, h) in self.detectFaces(img):
+			for (ex, ey, ew, eh) in self.detectEyes(img):
+				roi_color = self.img[y:y+h, x:x+w]
+				cv.rectangle(roi_color, (ex, ey), (ex+ew, ey+eh), (0, 255, 0), 2)
+
+    def loadIm(self, img):
+        self.img = cv.imread(img)
+        self.gray = cv.cvtColor(self.img, cv.COLOR_BGR2GRAY)
+
+	def showIm(self):
+		cv.imshow('img', self.img)
+		cv.waitKey(0)
+		cv.destroyAllWindows()
 
 def areyoumymom(Speecher):
 	tts_p.say("Its'a me, Marvin")
@@ -90,8 +148,14 @@ def center_face(face):
 	motion_p.angleInterpolation(["HeadYaw","HeadPitch"], [alpha, beta], [1.5, 1.5], False)
 
 
-def follow_gaze():
+def follow_gaze(face_coor):
+	with open('coor_face.txt') as fc:
+		fc.write(fc)
 	pass
+
+
+
+
 
 
 def get_joint_pos(chainName = "LArm", frame = "robot"):
@@ -246,62 +310,64 @@ def pointRandom():
 
 
 if __name__ == "__main__":
-	try:
-		try:
-			# create proxies
-			motion_p = ALProxy("ALMotion", nao_ip, nao_port)
-			posture_p = ALProxy("ALRobotPosture", nao_ip, nao_port)
-			face_det_p = ALProxy("ALFaceDetection", nao_ip, nao_port)
-			memory_p = ALProxy("ALMemory", nao_ip, nao_port)
-			tts_p = ALProxy("ALTextToSpeech", nao_ip, nao_port)
-			speech_rec_p = ALProxy("ALSpeechRecognition", nao_ip, nao_port)
-			video_p = ALProxy("ALVideoDevice", nao_ip, nao_port)
-			broker = ALBroker("broker", "0.0.0.0", 0, nao_ip, nao_port)
-
-		except Exception, e:
+    try:
+        try:
+            # create proxies
+            global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
+            motion_p = ALProxy("ALMotion", nao_ip, nao_port)
+            posture_p = ALProxy("ALRobotPosture", nao_ip, nao_port)
+            face_det_p = ALProxy("ALFaceDetection", nao_ip, nao_port)
+            memory_p = ALProxy("ALMemory", nao_ip, nao_port)
+            tts_p = ALProxy("ALTextToSpeech", nao_ip, nao_port)
+            speech_rec_p = ALProxy("ALSpeechRecognition", nao_ip, nao_port)
+            video_p = ALProxy("ALVideoDevice", nao_ip, nao_port)
+            broker = ALBroker("broker", "0.0.0.0", 0, nao_ip, nao_port)
+        except Exception, e:
 			print("Error while creating proxies:")
 			print(str(e))
 			sys.exit(0)
 
-		motion_p.wakeUp()
-		Speecher = SpeechRecognition("Speecher")
-		while True:
-			faceInfo = face_detection()
-			if faceInfo is not None:
-				center_face(faceInfo)
-				# if areyoumymom(Speecher):
-				break
-			# move head around until face is detected
-			time.sleep(0.5)
-			joint_list = ["HeadYaw", "HeadPitch"]
-			angle_list = [list(np.random.uniform(-0.8, 0.8, 1)), list(np.random.uniform(-0.6, 0.6, 1))]
-			times = [[1.25],[1.25]]
+        matlab = subprocess.Popen(["C:\\Users\\univeristy\\Anaconda3\\python.exe", "py64environment.py"])
 
-			# if False: the angles are added to the current position, else they are calculated relative to the origin
-			motion_p.angleInterpolation(joint_list, angle_list, times, True)
+        motion_p.wakeUp()
+        Speecher = SpeechRecognition("Speecher")
+        while True:
+        	faceInfo = face_detection()
+        	if faceInfo is not None:
+        		center_face(faceInfo)
+        		# if areyoumymom(Speecher):
+        		break
+        	# move head around until face is detected
+        	time.sleep(0.5)
+        	joint_list = ["HeadYaw", "HeadPitch"]
+        	angle_list = [list(np.random.uniform(-0.8, 0.8, 1)), list(np.random.uniform(-0.6, 0.6, 1))]
+        	times = [[1.25],[1.25]]
 
-
-		# TODO - define these methods
-		learnFace(faceInfo)
-		follow_gaze()
-
-		cam = connect_new_cam()
-
-		while True:
-			pointRandom()
-			image = get_remote_image(cam)
+        	# if False: the angles are added to the current position, else they are calculated relative to the origin
+        	motion_p.angleInterpolation(joint_list, angle_list, times, True)
 
 
-		circles = find_circles(cam)
-		pp = pprint.PrettyPrinter(indent=4)
-		pp.pprint(circles)
+        # TODO - define these methods
+        learnFace(faceInfo)
+        follow_gaze()
 
-		posture_p.goToPosture("Sit", 0.7)
-		motion_p.rest()
-		broker.shutdown()
-	except Exception , e:
-		print("Error in __main__", e)
-		# posture_p.goToPosture("Sit", 0.7)
-		motion_p.rest()
-		broker.shutdown()
-		sys.exit(0)
+        cam = connect_new_cam()
+
+        while True:
+        	pointRandom()
+        	image = get_remote_image(cam)
+
+
+        circles = find_circles(cam)
+        pp = pprint.PrettyPrinter(indent=4)
+        pp.pprint(circles)
+
+        posture_p.goToPosture("Sit", 0.7)
+        motion_p.rest()
+        broker.shutdown()
+    except Exception , e:
+        print("Error in __main__", e)
+        # posture_p.goToPosture("Sit", 0.7)
+        motion_p.rest()
+        broker.shutdown()
+        sys.exit(0)
