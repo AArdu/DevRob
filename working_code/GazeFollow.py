@@ -93,7 +93,57 @@ class GazeNet(Chain):
         return fc_0_0, fc_1_0, fc_0_1, fc_0_m1, fc_m1_0
 
     def loadWeights(self, npz_path):
-        npz.load_npz(npz_path, self)
+        npz_f = np.load(npz_path)
+        keys = ["arr_" + str(k_id) for k_id in range(len(npz_f.keys()))]
+
+        self.conv1.W.data = npz_f[keys[0]]
+        self.conv2.W.data = npz_f[keys[2]]
+        self.conv3.W.data = npz_f[keys[4]]
+        self.conv4.W.data = npz_f[keys[6]]
+        self.conv5.W.data = npz_f[keys[8]]
+        self.conv5_red.W.data = npz_f[keys[10]]
+        # now the layers that use the picture of the face
+        self.conv1_face.W.data = npz_f[keys[12]]
+        self.conv2_face.W.data = npz_f[keys[14]]
+        self.conv3_face.W.data = npz_f[keys[16]]
+        self.conv4_face.W.data = npz_f[keys[18]]
+        self.conv5_face.W.data = npz_f[keys[20]]
+        self.fc6_face.W.data = npz_f[keys[22]]
+        # other layers
+        self.fc7_face.W.data = npz_f[keys[24]]
+        self.fc8_face.W.data = npz_f[keys[26]]
+        self.importance_no_sigmoid.W.data = npz_f[keys[28]]
+        self.importance_map.W.data = npz_f[keys[30]]
+        self.fc_0_0.W.data = npz_f[keys[32]]
+        self.fc_1_0.W.data = npz_f[keys[34]]
+        self.fc_m1_0.W.data = npz_f[keys[36]]
+        self.fc_0_1.W.data = npz_f[keys[38]]
+        self.fc_0_m1.W.data = npz_f[keys[40]]
+
+        self.conv1.b.data = npz_f[keys[0 + 1]]
+        self.conv2.b.data = npz_f[keys[2 + 1]]
+        self.conv3.b.data = npz_f[keys[4 + 1]]
+        self.conv4.b.data = npz_f[keys[6 + 1]]
+        self.conv5.b.data = npz_f[keys[8 + 1]]
+        self.conv5_red.b.data = npz_f[keys[10 + 1]]
+        # now the layers that use the picture of the face
+        self.conv1_face.b.data = npz_f[keys[12 + 1]]
+        self.conv2_face.b.data = npz_f[keys[14 + 1]]
+        self.conv3_face.b.data = npz_f[keys[16 + 1]]
+        self.conv4_face.b.data = npz_f[keys[18 + 1]]
+        self.conv5_face.b.data = npz_f[keys[20 + 1]]
+        self.fc6_face.b.data = npz_f[keys[22]]
+        # other layers
+        self.fc7_face.b.data = npz_f[keys[24 + 1]]
+        self.fc8_face.b.data = npz_f[keys[26 + 1]]
+        self.importance_no_sigmoid.b = chainer.variable.Parameter(npz_f[keys[28 + 1]])
+        self.importance_map.b.data = npz_f[keys[30 + 1]]
+        self.fc_0_0.b.data = npz_f[keys[32 + 1]]
+        self.fc_1_0.b.data = npz_f[keys[34 + 1]]
+        self.fc_m1_0.b.data = npz_f[keys[36 + 1]]
+        self.fc_0_1.b.data = npz_f[keys[38 + 1]]
+        self.fc_0_m1.b.data = npz_f[keys[40 + 1]]
+
         return self
 
 class trainGazeNet():
@@ -276,9 +326,7 @@ class trainGazeNet():
 
 if __name__ == "__main__":
     GN = GazeNet()
-    train = trainGazeNet(GN)
-    a,b,c,s = train.generate_batch()
-    print(a)
+    GN.loadWeights("all_data\\train_GazeFollow\\binary_w.npz")
 
 
 
