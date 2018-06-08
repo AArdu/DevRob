@@ -5,7 +5,7 @@ import numpy as np
 # Marvin: 137
 # Naomi: 103\
 #
-nao_ip = "192.168.1.137"
+nao_ip = "169.254.199.32"
 nao_port = 9559
 
 global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
@@ -102,12 +102,23 @@ def pointRandom():
                ('RShoulderPitch', -0.785398, 0.785398)]
 
       angles = []
+      arm_pos = []
+      head_pos = []
+      arm = "RArm"
+      head = "Head"
+      frame = motion_p.FRAME_TORSO
+      useSensorValues = True
+
       for joint in armJoints:
           angle = random.uniform(joint[1], joint[2])
           angles.append((joint[0], angle))
           motion_p.angleInterpolation([joint[0]], [angle], [2.0], True)# (joint[0], angle, 0.1)
+          a = motion_p.getPosition(arm, 0, useSensorValues)
+          arm_pos.append(a)
+          h = motion_p.getPosition(head, 0, useSensorValues)
+          head_pos.append(h)
 
-      return angles
+      return angles, head_pos, arm_pos
 
 def find_circles(cam):
     """Inspect the image captured by the NAO's cam and finds colored circles"""
@@ -159,22 +170,30 @@ if __name__ == "__main__":
     circles_joints = {}
     circles_joints["circles"] = []
     circles_joints["joints"] = []
+    circles_joints["head_pos"] = []
+    circles_joints["arm_pos"] = []
+                
     motion_p.setAngles(["RElbowRoll", "RWristYaw"], [0.0349, -1.8238], 0.3)
     i = 0
     while i < 225:
-        angles = pointRandom()
+        angles, head_pos, arm_pos = pointRandom()
         circles = find_circles(cam)
         if circles['pink'] is not None:
             if len(circles['pink']['centers']) == 1:
-                print("Pink ball detected")
+                print("Pink ball #{} detected".format(i))
                 # image = get_remote_image(cam)
                 # cv2.imwrite("./arm_images/pointing_{}.png".format(i), image)
                 circles_joints["circles"].append(circles['pink']['centers'])
                 circles_joints["joints"].append(angles)
+                circles_joints["head_pos"].append(head_pos)
+                circles_joints["arm_pos"].append(arm_pos)
+                
+
                 i += 1
         if i % 8  == 0 and i != 0:
             with open('./data.json', 'w+') as fp:
                 json.dump(circles_joints, fp)
+            print("I'm going to rest for a bit.")
             motion_p.rest()
             i += 1
             time.sleep(200)
