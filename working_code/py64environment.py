@@ -12,7 +12,6 @@ while True:
     time.sleep(1)
     with open("centers_read.txt", "r+") as c_file:
         centers = c_file.read()
-        c_file.write()
 
     open("centers_read.txt", 'w').close()
 
