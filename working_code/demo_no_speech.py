@@ -1,9 +1,10 @@
-import naoqi
 from naoqi import ALProxy, ALModule, ALBroker
+import naoqi
 import numpy as np
 import cv2, time, sys, StringIO, json, httplib, wave, pprint
 import random
 import subprocess
+from GazeFollow import GazeNet as GNet
 
 
 nao_ip = "192.168.1.137"
@@ -147,8 +148,6 @@ def face_detection():
 
 	return None
 
-def learnFace(face):
-	pass
 
 def center_face(face):
 	"""
@@ -166,17 +165,67 @@ def center_face(face):
 	motion_p.angleInterpolation(["HeadYaw","HeadPitch"], [alpha, beta], [1.5, 1.5], False)
 
 
-def follow_gaze():
-    #with open('coor_face.txt') as fc:
-    #	fc.write(fc)
-    #pass
-    cam = connect_new_cam()
+def follow_gaze(cam, GazeNet):
+
     img = get_remote_image(cam)
     FaceDetector(img, True)
+
     #e = FaceDetector.detectCenterFaces()
     #FaceDetector.drawCenterFaces()
-    #FaceDetector.showIm()
+    #FaceDetector.showIm
 
+    # get gaze directions
+    gaze_coords = Gazenet.getGaze(e, img)
+    # use gaze directions to look and point in that direction
+    point_at_gazed(gaze_coords, cam)
+
+def point_at_gazed(coords, cam):
+    # get the angles needed to look at the pointed object
+    joint_angles = sendCoorGetAngl(coords)
+    if joint_angles == '':
+        posture_p.goToPosture(posture_p.getPosture(), 0.5)
+    else:
+        # TODO distinguish head angles from joint angles
+        joint_angles = list(joint_angles)
+        frame = 0 # motion_p.FRAME_TORSO
+        motion_p.positionInterpolations("Head", frame, joint_angles[:5], 7, 1.5)
+        arm_chain = choose_arm()
+        if find_circles(cam) is not None:
+            # FIXME pointing should only be done when the ball is in the expected position, not if any ball is in the visual fiels
+            motion_p.positionInterpolations(arm_chain, frame, joint_angles[6:], 7, 1.5)
+        else:
+            tts_p.say("I do not see the ball that you are looking at")
+
+def sendCoorGetAngl(coords):
+    # TODO check that MATLAB and python are writing and reading in the same way
+    # write coordinate data to file read by 64 bit environment
+    with open("./all_data/centers_read.txt", 'w+') as fc:
+        fc.write(coords)
+
+    counter = 0
+    tts_p.say("I'm going to guess where your gaze is pointing")
+    while counter < 3:
+        time.sleep(1)
+        if os.stat("./all_data/centers_read.txt").st_size > 0:
+            time.sleep(0.5)
+            with open("joints_read.txt", 'r') as fj:
+                joint_angles = fj.read()
+
+            # delete content of the file once the joint values are read
+            open("centers_read.txt", 'w').close()
+            return joint_angles
+        else:
+            counter += 1
+
+    tts_p.say("I do not know what direction you are looking at")
+    return ''
+
+
+def choose_arm():
+    if (motion_p.getAngles('HeadYaw') > 0):
+        return 'LArm'
+    else:
+        return 'RArm'
 
 def get_joint_pos(chainName = "LArm", frame = "robot"):
 	if frame == "torso":
@@ -313,6 +362,9 @@ def find_circles(cam):
 	u_pink = np.array([180, 255, 255])
 	detected_circles['pink'] = get_colored_circle(image, l_pink, u_pink)
 
+    if sum([detected_circles[k] == None for k in detected_circles.keys()]) == 0:
+        return None
+
 	return detected_circles
 
 def pointRandom():
@@ -346,8 +398,9 @@ if __name__ == "__main__":
 			print("Error while creating proxies:")
 			print(str(e))
 			sys.exit(0)
-
         matlab = subprocess.Popen(["C:\\Users\\univeristy\\Anaconda3\\python.exe", "py64environment.py"])
+        GazeNet = GNet()
+        GazeNet = GazeNet.loadWeights("all_data\\train_GazeFollow\\binary_w.npz")
 
         motion_p.wakeUp()
         Speecher = SpeechRecognition("Speecher")
@@ -357,6 +410,7 @@ if __name__ == "__main__":
         		center_face(faceInfo)
         		# if areyoumymom(Speecher):
         		break
+
         	# move head around until face is detected
         	time.sleep(0.5)
         	joint_list = ["HeadYaw", "HeadPitch"]
@@ -366,18 +420,12 @@ if __name__ == "__main__":
         	# if False: the angles are added to the current position, else they are calculated relative to the origin
         	motion_p.angleInterpolation(joint_list, angle_list, times, True)
 
-        follow_gaze()
+        cam = connect_new_cam()
+
+        follow_gaze(cam, GazeNet)
+
         # TODO - define these methods
         if False:
-            learnFace(faceInfo)
-            follow_gaze()
-
-            cam = connect_new_cam()
-
-            while True:
-            	pointRandom()
-            	image = get_remote_image(cam)
-
 
             circles = find_circles(cam)
             pp = pprint.PrettyPrinter(indent=4)

@@ -73,12 +73,38 @@ output = eng.sim(network, input, nargout = nrDimensions)
 
 def reach(target, stepsize, mu, spead, w, nrHidden):
     # Check if the object is on the left or right from the core of the body.
-
+    # this assumes you already fixated on the target object, but can be changed later on to be independent from gaze direction.
+    if(motion_p.getAngles('HeadYaw') > 0):
+        side = 'left'
+    else:
+        side = 'right'
     
-    # jointList = [LShoulderPitch, LShoulderRoll, LElbowYaw, LElbowRoll]
-    # motion_p.getAngles(jointList)
-    jointVector= (0.1,0.2,0.1,0.3) # this should be the initial position of the joints
-    location = useRBF(jointVector, w, mu, spread, nrHidden)     # current location of the hand
+    
+    if(side == "left"):
+        jointList = ["HeadYaw", "HeadPitch", "LShoulderRoll", "LShoulderPitch"]
+    elif(side == "right"):
+        jointList = ["HeadYaw", "HeadPitch", "RShoulderRoll", "RShoulderPitch"]
+    
+    jointVector = motion_p.getAngles(jointList) # this should be the initial position of the joints
+    
+    if(side == "left"):
+        #indices = np.where(jointList == "HeadYaw") or np.where(jointList == "RShoulderPitch") or np.where(jointList == "RShoulderRoll") 
+        jointVector[1:] = -jointVector[1:]
+    
+
+    #location = useRBF(jointVector, w, mu, spread, nrHidden)     # current location of the hand
+    import matlab.engine
+    eng = matlab.engine.start_matlab()
+    location = eng.sim(net, jointVector, nargout = nrDimensions)
+
+    # If at the left side, the x coordinate should switch as well, for both the target and the location.
+    if(side == "left"):
+        locationSwitched = location
+        locationSwitched[0] = 640 - location[0]
+
+        targetSwitched = target
+        targetSwitched[0] = 640 - target[0]
+    
     counter  = 0    # counts how many movement steps are made
     alfa = 0  
 
@@ -94,11 +120,21 @@ def reach(target, stepsize, mu, spead, w, nrHidden):
         invJacobian = pinv(jacobian)
         difLocation = alfa*(target-location)
         jointVector = jointVector + np.dot(difLocation,invJacobian)
-        # TODO: move the NAO
+         
         jointVector = jointVector[0,:]
-        print jointVector
+
+        if(side == "right"):
+            motion_p.setAngles(jointList, jointVector, 0.1)
+
+        else if(side == "left"):
+            jointVector[1:] = -jointVector[1:] # change back to left-values.
+            motion_p.setAngles(jointList, jointVector, 0.1)
+            
         location = useRBF(jointVector, w, mu, spread, nrHidden)  
-        
+        if(side == "left"):
+            locationSwitched = location
+            locationSwitched[0] = 640 - location[0]
+
         
 def calculateJacobian(DOF, nrHidden, jointVector, mu, spread):
     #Calculate the activations of the hidden nodes
@@ -114,7 +150,7 @@ def calculateJacobian(DOF, nrHidden, jointVector, mu, spread):
     return output
    
 
-[mu, spread, w] = TrainRBF(nrSimulations, nrHidden, testInput, testOutput)
-outputRBF = useRBF(np.random.rand(4), w, mu, spread, nrHidden)
+# [mu, spread, w] = TrainRBF(nrSimulations, nrHidden, testInput, testOutput)
+# outputRBF = useRBF(np.random.rand(4), w, mu, spread, nrHidden)
 reach((50,100), stepsize, mu, spread, w, nrHidden)
 
