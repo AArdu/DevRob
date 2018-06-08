@@ -7,12 +7,14 @@ eng.load("./all_data/trainedRBF.mat")
 
 while True:
     while os.stat("./all_data/centers_read.txt").st_size == 0:
-        time.sleep(.5)
+        time.sleep(1)
 
     time.sleep(1)
     with open("centers_read.txt", "r+") as c_file:
         centers = c_file.read()
         c_file.write()
+
+    open("centers_read.txt", 'w').close()
 
     eng.workspace['centers'] = centers
     eng.eval("new_joints = sim(net, centers);", nargout=0)
