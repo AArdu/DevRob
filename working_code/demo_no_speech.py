@@ -183,9 +183,9 @@ def point_at_gazed(coords, cam):
     # get the angles needed to look at the pointed object
     joint_angles = sendCoorGetAngl(coords)
     if joint_angles == '':
-        posture_p.goToPosture(posture_p.getPosture(), 0.5)
+        tts_p.say("I do not understand where you are looking")
     else:
-        # TODO distinguish head angles from joint angles
+        # TODO check distinction between head angles and joint angles
         joint_angles = list(joint_angles)
         frame = 0 # motion_p.FRAME_TORSO
         motion_p.positionInterpolations("Head", frame, joint_angles[:5], 7, 1.5)
@@ -424,9 +424,7 @@ if __name__ == "__main__":
 
         follow_gaze(cam, GazeNet)
 
-        # TODO - define these methods
         if False:
-
             circles = find_circles(cam)
             pp = pprint.PrettyPrinter(indent=4)
             pp.pprint(circles)
