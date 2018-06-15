@@ -1,6 +1,8 @@
 import cv2
 import GazeFollow
-
+from sklearn.model_selection import train_test_split
+import os
+import scipy.io
 
 class FaceDetector:
 	"""
@@ -79,16 +81,48 @@ class FaceDetector:
 		cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-	img = "./all_data/Gaze.jpg"
-	fd = FaceDetector(img, True)
-	e = fd.detectCenterFaces()
 	GN = GazeFollow.GazeNet()
-	GN.loadWeights("./all_data/train_GazeFollow/binary_w.npz")
-	x, y = GN.getGaze(e[0], img)
+	data = scipy.io.loadmat("C:/Users/The Mountain/Downloads/data/test_annotations.mat")
+	print(data["test_bbox"][0][0])
+	x, y, w, h = data["test_bbox"][0][0][0]
+	ex, ey = data["test_eyes"][0][0][0]
+	px, py = data["test_gaze"][0][0][0]
+	img = os.path.join("C:\Users\The Mountain\Downloads\data", data["test_path"][0][0][0])
 	image = cv2.imread(img)
-	cv2.line(image, (x - 5, y), (x + 5, y), (255, 0, 0))
-	cv2.line(image, (x, y - 5), (x, y + 5), (255, 0, 0))
+	cv2.rectangle(image, (int(x*image.shape[1]),int(y*image.shape[0])), (int(x*image.shape[1]+w*image.shape[1]), int(y*image.shape[0]+h*image.shape[0])), (255,255,255))
+	cv2.circle(image, (int(ex*image.shape[1]), int(ey*image.shape[0])), 10, (255,255,255))
+	cv2.circle(image, (int(px*image.shape[1]), int(py*image.shape[0])), 10, (0,255,255))
 	cv2.imshow('img', image)
 	cv2.waitKey(0)
 	cv2.destroyAllWindows()
+
+
+
+
+
+	# fc = []
+	# for bbox in data["test_bbox"]:
+	# 	fc.append([bbox])
+	# print(data.keys())
+
+
+
+
+
+	#
+	# for i in range(9):
+	# 	img = "./all_data/Gaze" + str(i) + ".jpg"
+	# 	fd = FaceDetector(img, True)
+	# 	e = fd.detectCenterFaces()
+	# 	GN = GazeFollow.GazeNet()
+	# 	GN.loadWeights("./all_data/train_GazeFollow/binary_w.npz")
+	# 	x, y = GN.getGaze(e[0], img)
+	# 	print("X {} and Y {}".format(x, y))
+	# 	image = cv2.imread(img)
+	# 	cv2.circle(image,(x, y), 10, (0,255,0))
+	# 	cv2.line(image, (x - 5, y), (x + 5, y), (255, 0, 0))
+	# 	cv2.line(image, (x, y - 5), (x, y + 5), (255, 0, 0))
+	# 	cv2.imshow('img', image)
+	# 	cv2.waitKey(0)
+	# 	cv2.destroyAllWindows()
 
