@@ -162,14 +162,15 @@ class GazeNet(Chain):
         """
         input_shape = [227, 227]
         alpha = 0.3
-        img = imread(img)
+        #img = imread(img)
         img_resize = None
         # height, width
         # crop of face (input 2)
-        print("\nSize of the image is wy: {}, wx{}".format(img.shape[0], img.shape[1]))                                 # Delete this statement
+        print("\nSize of the image is wy: {}, wx {}".format(img.shape[0], img.shape[1]))                                 # Delete this statement
         wy = int(alpha * img.shape[0])
         wx = int(alpha * img.shape[1])
-        center = [int(e[0] * img.shape[1]), int(e[1] * img.shape[0])]
+        # TODO - catch this in case box is not found
+        center = [int(e[0][0] * img.shape[1]), int(e[0][1] * img.shape[0])]
         y1 = int(center[1] - .5 * wy) - 1
         y2 = int(center[1] + .5 * wy) - 1
         x1 = int(center[0] - .5 * wx) - 1
@@ -178,7 +179,7 @@ class GazeNet(Chain):
         im_face = img[y1:y2, x1:x2, :]
 
         # subtract mean from images
-        places_mean = sio.loadmat('all_data/places_mean_resize.mat')
+        places_mean = sio.loadmat('./all_data/places_mean_resize.mat')
         imagenet_mean = sio.loadmat('all_data/imagenet_mean_resize.mat')
         places_mean = places_mean['image_mean']
         imagenet_mean = imagenet_mean['image_mean']
@@ -343,4 +344,3 @@ class GazeNet(Chain):
 if __name__ == "__main__":
     GN = GazeNet()
     GN.loadWeights("all_data/train_GazeFollow/binary_w.npz")
-
