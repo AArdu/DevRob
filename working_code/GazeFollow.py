@@ -137,7 +137,7 @@ class GazeNet(Chain):
         self.conv3_face.b.data = npz_f[keys[16 + 1]]
         self.conv4_face.b.data = npz_f[keys[18 + 1]]
         self.conv5_face.b.data = npz_f[keys[20 + 1]]
-        self.fc6_face.b.data = npz_f[keys[22]]
+        self.fc6_face.b.data = npz_f[keys[22 +1]]
         # other layers
         self.fc7_face.b.data = npz_f[keys[24 + 1]]
         self.fc8_face.b.data = npz_f[keys[26 + 1]]
@@ -166,6 +166,7 @@ class GazeNet(Chain):
         img_resize = None
         # height, width
         # crop of face (input 2)
+        print("\nSize of the image is wy: {}, wx{}".format(img.shape[0], img.shape[1]))                                 # Delete this statement
         wy = int(alpha * img.shape[0])
         wx = int(alpha * img.shape[1])
         center = [int(e[0] * img.shape[1]), int(e[1] * img.shape[0])]
@@ -251,20 +252,20 @@ class GazeNet(Chain):
         f_val -- output of the Caffe model
         """
         fc_0_0 = f_val['fc_0_0'].T
-        fc_0_1 = f_val['fc_0_1'].T
+        fc_1_0 = f_val['fc_1_0'].T
         fc_m1_0 = f_val['fc_m1_0'].T
         fc_0_1 = f_val['fc_0_1'].T
         fc_0_m1 = f_val['fc_0_m1'].T
-        f_0_0 = np.reshape(fc_0_0, (5, 5))
-        f_1_0 = np.reshape(fc_0_1, (5, 5))
-        f_m1_0 = np.reshape(fc_m1_0, (5, 5))
-        f_0_1 = np.reshape(fc_0_1, (5, 5))
-        f_0_m1 = np.reshape(fc_0_m1, (5, 5))
-        gaze_grid_list = [self.alpha_exponentiate(f_0_0), \
-                          self.alpha_exponentiate(f_1_0), \
-                          self.alpha_exponentiate(f_m1_0), \
-                          self.alpha_exponentiate(f_0_1), \
-                          self.alpha_exponentiate(f_0_m1)]
+        f_0_0 = F.reshape(fc_0_0, (5, 5))
+        f_1_0 = F.reshape(fc_1_0, (5, 5))
+        f_m1_0 = F.reshape(fc_m1_0, (5, 5))
+        f_0_1 = F.reshape(fc_0_1, (5, 5))
+        f_0_m1 = F.reshape(fc_0_m1, (5, 5))
+        gaze_grid_list = [self.alpha_exponentiate(f_0_0.data), \
+                          self.alpha_exponentiate(f_1_0.data), \
+                          self.alpha_exponentiate(f_m1_0.data), \
+                          self.alpha_exponentiate(f_0_1.data), \
+                          self.alpha_exponentiate(f_0_m1.data)]
         shifted_x = [0, 1, -1, 0, 0]
         shifted_y = [0, 0, 0, -1, 1]
         count_map = np.ones([15, 15])
@@ -282,8 +283,8 @@ class GazeNet(Chain):
         final_map = resize(average_map, (227, 227), interp='bicubic')
         idx = np.argmax(final_map.flatten())
         [rows, cols] = self.ind2sub2((227, 227), idx)
-        y_predict = rows / 227
-        x_predict = cols / 227
+        y_predict = rows / 227.
+        x_predict = cols / 227.
         return final_map, [x_predict, y_predict]
 
     def alpha_exponentiate(self, x, alpha=0.3):
@@ -328,8 +329,12 @@ class GazeNet(Chain):
         image, image_resize, head_image, head_loc = self.prepImages(image, e)
         f_val = self.predictGaze(image_resize, head_image, head_loc)
         final_map, predictions = self.postProcessing(f_val)
-        x = predictions[0] * np.shape(image)[0]
-        y = predictions[1] * np.shape(image)[1]
+        print("Predictions = {}".format(predictions))
+        print("Shape of the image is: X={}, Y={}".format(np.shape(image)[0], np.shape(image)[1]))
+        x = (1-predictions[0]) * np.shape(image)[1]
+        y = (1-predictions[1]) * np.shape(image)[0]
+        # x = predictions[0] * np.shape(image)[1]
+        # y = predictions[1] * np.shape(image)[0]
         x = int(x)
         y = int(y)
         return [x, y]
