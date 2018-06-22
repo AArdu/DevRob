@@ -4,6 +4,7 @@ import pprint
 import random
 import StringIO
 import subprocess
+<<<<<<< HEAD
 import sys
 import time
 import wave
@@ -14,16 +15,25 @@ import numpy as np
 import cv2
 import FaceDetection
 import naoqi
+=======
+import FaceDetection as FD
+>>>>>>> 80a4774dc96c7c5c2fdde59b5135e2d903e6c395
 from GazeFollow import GazeNet as GNet
 from naoqi import ALBroker, ALModule, ALProxy
 
+<<<<<<< HEAD
 nao_ip = "192.168.1.104"
+=======
+
+nao_ip = "192.168.1.124"
+>>>>>>> 80a4774dc96c7c5c2fdde59b5135e2d903e6c395
 nao_port = 9559
 
 # motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p = None
 
 
 class SpeechRecognition(ALModule):
+<<<<<<< HEAD
     def __init__(self, name):
         try:
             p = ALProxy(name)
@@ -56,6 +66,41 @@ class SpeechRecognition(ALModule):
             memory_p.unsubscribeToEvent("WordRecognized", Speecher.name)
             sys.exit(0)
             return
+=======
+	def __init__(self, name):
+		try:
+			p = ALProxy(name)
+			p.exit()
+		except:
+			pass
+		ALModule.__init__(self,name)
+		self.response = False
+		self.value = []
+		self.name = name
+		self.spr = ALProxy("ALSpeechRecognition")
+		self.spr.pause(True)
+
+
+	def getSpeech(self, wordlist, wordspotting):
+		self.response = False
+		self.value = []
+		self.spr.setVocabulary(wordlist, wordspotting)
+		self.spr.pause(False)
+		memory_p.subscribeToEvent("WordRecognized", self.name, "onDetect")
+
+	def onDetect(self, keyname, value, subsriber_name):
+		self.response = True
+		self.value = value
+		print(value)
+		memory_.unsubscribeToEvent("WordRecognized", self.name)
+		self.spr.pause(True)
+
+		if "abort" in self.value[0]:
+			self.response = False
+			memory_p.unsubscribeToEvent("WordRecognized", Speecher.name)
+			sys.exit(0)
+			return
+>>>>>>> 80a4774dc96c7c5c2fdde59b5135e2d903e6c395
 
 
 def areyoumymom(Speecher):
@@ -86,6 +131,7 @@ def face_detection():
 
 
 def center_face(face):
+<<<<<<< HEAD
     """
     Moves the head so that the first face
     on the list is at the center of the visual field
@@ -131,9 +177,73 @@ def look_at_gazed(coords, cam):
                 arm_chain, frame, joint_angles[6:], 7, 1.5)
         else:
             tts_p.say("I do not see the ball that you are looking at")
+=======
+	"""
+	Moves the head so that the first face
+	on the list is at the center of the visual field
+	"""
+	# pp = pprint.PrettyPrinter(indent=4)
+	# print(len(face))
+	# pp.pprint(face)
+	ShapeInfo = face[1][0][0]
+	cameraTorso = face[2]
+	alpha = ShapeInfo[1]
+	beta = ShapeInfo[2]
+	# TODO make it center the biggest (closest) face
+	motion_p.angleInterpolation(["HeadYaw","HeadPitch"], [alpha, beta], [1.5, 1.5], False)
+
+
+def follow_gaze(cam, GazeNet):
+	center_of_face = []
+	while len(center_of_face) == 0:
+		img = get_remote_image(cam)
+		fd = FD.FaceDetector(img, True)
+		center_of_face = fd.detectCenterFaces()
+		if len(e) > 0:
+			# get gaze directions
+			gaze_coords = GazeNet.getGaze(center_of_face, img)
+			# use gaze directions to look and point in that direction
+			# gaze predicted location
+			look_at_gazed(gaze_coords)
+			# detect object
+			
+			# if detected:
+			# gaze object
+			# point
+
+			point_at_gazed(gaze_coords, cam)
+
+def look_at_gazed(coords):
+	coords[0] = coords[0]- 320
+	coords[1]= coords[1]-240
+
+	x_angle = coords[0]/640*60.97
+	y_angle = coords[1]/480*47.64
+
+	motion_p.angleInterpolation(["HeadYaw", "HeadPitch"], [x_angle, y_angle], [1.5, 1.5], False)
+
+
+def point_at_gazed(coords, cam):
+	# get the angles needed to look at the pointed object
+	joint_angles = sendCoorGetAngl(coords)
+	if joint_angles == '':
+		tts_p.say("I do not understand where you are looking")
+	else:
+		# TODO check distinction between head angles and joint angles
+		joint_angles = list(joint_angles)
+		frame = 0 # motion_p.FRAME_TORSO
+		motion_p.positionInterpolations("Head", frame, joint_angles[:5], 7, 1.5)
+		arm_chain = choose_arm()
+		if find_circles(cam) is not None:
+			# FIXME pointing should only be done when the ball is in the expected position, not if any ball is in the visual fiels
+			motion_p.positionInterpolations(arm_chain, frame, joint_angles[6:], 7, 1.5)
+		else:
+			tts_p.say("I do not see the ball that you are looking at")
+>>>>>>> 80a4774dc96c7c5c2fdde59b5135e2d903e6c395
 
 
 def sendCoorGetAngl(coords):
+<<<<<<< HEAD
     # TODO check that MATLAB and python are writing and reading in the same way
     # write coordinate data to file read by 64 bit environment
     with open("./all_data/centers_read.txt", 'w+') as fc:
@@ -156,13 +266,37 @@ def sendCoorGetAngl(coords):
 
     tts_p.say("I do not know what direction you are looking at")
     return ''
+=======
+	# TODO check that MATLAB and python are writing and reading in the same way
+	# write coordinate data to file read by 64 bit environment
+	with open("./all_data/centers_read.txt", 'w+') as fc:
+		fc.write(coords)
+
+	counter = 0
+	tts_p.say("I'm going to guess where your gaze is pointing")
+	while counter < 3:
+		time.sleep(1)
+		if os.stat("./all_data/centers_read.txt").st_size > 0:
+			time.sleep(0.5)
+			with open("joints_read.txt", 'r') as fj:
+				joint_angles = fj.read()
+
+			# delete content of the file once the joint values are read
+			open("centers_read.txt", 'w').close()
+			return joint_angles
+		else:
+			counter += 1
+
+	tts_p.say("I do not know what direction you are looking at")
+	return ''
+>>>>>>> 80a4774dc96c7c5c2fdde59b5135e2d903e6c395
 
 
 def choose_arm():
-    if (motion_p.getAngles('HeadYaw') > 0):
-        return 'LArm'
-    else:
-        return 'RArm'
+	if (motion_p.getAngles('HeadYaw') > 0):
+		return 'LArm'
+	else:
+		return 'RArm'
 
 
 def get_joint_pos(chainName="LArm", frame="robot"):
@@ -298,17 +432,25 @@ def find_circles(cam):
     u_pink = np.array([180, 255, 255])
     detected_circles['pink'] = get_colored_circle(image, l_pink, u_pink)
 
-    if sum([detected_circles[k] == None for k in detected_circles.keys()]) == 0:
-        return None
+	if sum([detected_circles[k] == None for k in detected_circles.keys()]) == 0:
+		return None
 
     return detected_circles
 
 def pointRandom():
+<<<<<<< HEAD
     # motionProxy = ALProxy('ALMotion')
     armJoints=[('HeadYaw', -2.0857, 0),
              ('HeadPitch', -0.330041, 0.200015),
              ('RShoulderRoll', -1.3265, 0.3142),
              ('RShoulderPitch', -2.0857, 2.0857)]
+=======
+	# motionProxy = ALProxy('ALMotion')
+	armJoints = [('HeadYaw', -2.0857, 0),
+			 ('HeadPitch', -0.330041, 0.200015),
+			 ('RShoulderRoll', -1.3265, 0.3142),
+			 ('RShoulderPitch', -2.0857, 2.0857)]
+>>>>>>> 80a4774dc96c7c5c2fdde59b5135e2d903e6c395
 
     for joint in armJoints:
         angle=random.uniform(joint[1], joint[2])
@@ -318,6 +460,7 @@ def pointRandom():
 
 
 if __name__ == "__main__":
+<<<<<<< HEAD
     try:
         try:
             # create proxies
@@ -378,3 +521,61 @@ if __name__ == "__main__":
         motion_p.rest()
         broker.shutdown()
         sys.exit(0)
+=======
+	try:
+		try:
+			# create proxies
+			global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
+			motion_p = ALProxy("ALMotion", nao_ip, nao_port)
+			posture_p = ALProxy("ALRobotPosture", nao_ip, nao_port)
+			face_det_p = ALProxy("ALFaceDetection", nao_ip, nao_port)
+			memory_p = ALProxy("ALMemory", nao_ip, nao_port)
+			tts_p = ALProxy("ALTextToSpeech", nao_ip, nao_port)
+			speech_rec_p = ALProxy("ALSpeechRecognition", nao_ip, nao_port)
+			video_p = ALProxy("ALVideoDevice", nao_ip, nao_port)
+			broker = ALBroker("broker", "0.0.0.0", 0, nao_ip, nao_port)
+		except Exception, e:
+			print("Error while creating proxies:")
+			print(str(e))
+			sys.exit(0)
+		matlab = subprocess.Popen(["C:\\Users\\univeristy\\Anaconda3\\python.exe", "py64environment.py"])
+		GazeNet = GNet()
+		GazeNet = GazeNet.loadWeights("all_data\\train_GazeFollow\\binary_w.npz")
+
+		motion_p.wakeUp()
+		Speecher = SpeechRecognition("Speecher")
+		while True:
+			faceInfo = face_detection()
+			if faceInfo is not None:
+				center_face(faceInfo)
+				# if areyoumymom(Speecher):
+				break
+
+			# move head around until face is detected
+			time.sleep(0.5)
+			joint_list = ["HeadYaw", "HeadPitch"]
+			angle_list = [list(np.random.uniform(-0.8, 0.8, 1)), list(np.random.uniform(-0.6, 0.6, 1))]
+			times = [[1.25],[1.25]]
+
+			# if False: the angles are added to the current position, else they are calculated relative to the origin
+			motion_p.angleInterpolation(joint_list, angle_list, times, True)
+
+		cam = connect_new_cam()
+
+		follow_gaze(cam, GazeNet)
+
+		if False:
+			circles = find_circles(cam)
+			pp = pprint.PrettyPrinter(indent=4)
+			pp.pprint(circles)
+
+		posture_p.goToPosture("Sit", 0.7)
+		motion_p.rest()
+		broker.shutdown()
+	except Exception , e:
+		print("Error in __main__", e)
+		# posture_p.goToPosture("Sit", 0.7)
+		motion_p.rest()
+		broker.shutdown()
+		sys.exit(0)
+>>>>>>> 80a4774dc96c7c5c2fdde59b5135e2d903e6c395
