@@ -331,8 +331,10 @@ class GazeNet(Chain):
         final_map, predictions = self.postProcessing(f_val)
         print("Predictions = {}".format(predictions))
         print("Shape of the image is: X={}, Y={}".format(np.shape(image)[0], np.shape(image)[1]))
-        x = predictions[0] * np.shape(image)[1]
-        y = predictions[1] * np.shape(image)[0]
+        x = (1-predictions[0]) * np.shape(image)[1]
+        y = (1-predictions[1]) * np.shape(image)[0]
+        # x = predictions[0] * np.shape(image)[1]
+        # y = predictions[1] * np.shape(image)[0]
         x = int(x)
         y = int(y)
         return [x, y]

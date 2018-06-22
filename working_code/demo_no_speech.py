@@ -4,7 +4,7 @@ import numpy as np
 import cv2, time, sys, StringIO, json, httplib, wave, pprint
 import random
 import subprocess
-from GazeFollow import GazeNet as GNet
+import GazeFollow.py
 
 
 nao_ip = "192.168.1.137"
@@ -167,17 +167,12 @@ def center_face(face):
 
 def follow_gaze(cam, GazeNet):
 
-    img = get_remote_image(cam)
-    FaceDetector(img, True)
-
-    #e = FaceDetector.detectCenterFaces()
-    #FaceDetector.drawCenterFaces()
-    #FaceDetector.showIm
-
-    # get gaze directions
-    gaze_coords = Gazenet.getGaze(e, img)
-    # use gaze directions to look and point in that direction
-    point_at_gazed(gaze_coords, cam)
+	img = get_remote_image(cam)
+	FaceDetector(img, True)
+	center_of_face = FaceDetector.detectCenterFaces()
+	gaze_coords = GazeNet.getGaze(center_of_face, img)
+	# use gaze directions to look and point in that direction
+	point_at_gazed(gaze_coords, cam)
 
 def point_at_gazed(coords, cam):
     # get the angles needed to look at the pointed object

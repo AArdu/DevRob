@@ -82,24 +82,49 @@ class FaceDetector:
 
 if __name__ == "__main__":
 	GN = GazeFollow.GazeNet()
+	GN.loadWeights("./all_data/train_GazeFollow/binary_w.npz")
 	data = scipy.io.loadmat("C:/Users/The Mountain/Downloads/data/test_annotations.mat")
-	print(data["test_bbox"][0][0])
-	x, y, w, h = data["test_bbox"][0][0][0]
-	ex, ey = data["test_eyes"][0][0][0]
-	px, py = data["test_gaze"][0][0][0]
-	img = os.path.join("C:\Users\The Mountain\Downloads\data", data["test_path"][0][0][0])
-	image = cv2.imread(img)
-	cv2.rectangle(image, (int(x*image.shape[1]),int(y*image.shape[0])), (int(x*image.shape[1]+w*image.shape[1]), int(y*image.shape[0]+h*image.shape[0])), (255,255,255))
-	cv2.circle(image, (int(ex*image.shape[1]), int(ey*image.shape[0])), 10, (255,255,255))
-	cv2.circle(image, (int(px*image.shape[1]), int(py*image.shape[0])), 10, (0,255,255))
-	cv2.imshow('img', image)
-	cv2.waitKey(0)
-	cv2.destroyAllWindows()
+	f = open("C:/Users/The Mountain/Downloads/data/test_annotations.txt")
+	while True:
+		data = f.readline()
+		data = data.split(",")
+		x, y, w, h = [float(i) for i in data[2:6]]
+		ex, ey =  [float(i) for i in data[6:8]]
+		px, py =  [float(i) for i in data[8:10]]
+		img = os.path.join("C:\Users\The Mountain\Downloads\data", data[0])
+		image = cv2.imread(img)
+		fd = FaceDetector(img)
+		e = fd.detectCenterFaces()
+		if len(e) > 0:
+			cv2.rectangle(image, (int(x*image.shape[1]),int(y*image.shape[0])), (int(x*image.shape[1]+w*image.shape[1]), int(y*image.shape[0]+h*image.shape[0])), (255,255,255))
+			cv2.circle(image, (int(ex*image.shape[1]), int(ey*image.shape[0])), 10, (255,255,255))
+			cv2.circle(image, (int(px*image.shape[1]), int(py*image.shape[0])), 10, (0,255,255))
+			x, y = GN.getGaze(e[0], img)
+			print("X {} and Y {}".format(x, y))
+			cv2.circle(image,(x, y), 10, (0,255,0))
+			cv2.line(image, (x - 5, y), (x + 5, y), (255, 0, 0))
+			cv2.line(image, (x, y - 5), (x, y + 5), (255, 0, 0))
+			cv2.imshow('img', image)
+			cv2.waitKey(0)
+			cv2.destroyAllWindows()
+
+	# print(data["test_bbox"][0][0])
+	# x, y, w, h = data["test_bbox"][0][0][0]
+	# ex, ey = data["test_eyes"][0][0][0]
+	# px, py = data["test_gaze"][0][0][0]
+	# img = os.path.join("C:\Users\The Mountain\Downloads\data", data["test_path"][0][0][0])
+	# image = cv2.imread(img)
+	# cv2.rectangle(image, (int(x*image.shape[1]),int(y*image.shape[0])), (int(x*image.shape[1]+w*image.shape[1]), int(y*image.shape[0]+h*image.shape[0])), (255,255,255))
+	# cv2.circle(image, (int(ex*image.shape[1]), int(ey*image.shape[0])), 10, (255,255,255))
+	# cv2.circle(image, (int(px*image.shape[1]), int(py*image.shape[0])), 10, (0,255,255))
+	# cv2.imshow('img', image)
+	# cv2.waitKey(0)
+	# cv2.destroyAllWindows()
 
 
 
 
-
+	#
 	# fc = []
 	# for bbox in data["test_bbox"]:
 	# 	fc.append([bbox])
@@ -108,7 +133,7 @@ if __name__ == "__main__":
 
 
 
-
+	#
 	#
 	# for i in range(9):
 	# 	img = "./all_data/Gaze" + str(i) + ".jpg"
