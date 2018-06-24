@@ -149,3 +149,4 @@ if __name__ == "__main__":
 	# 	cv2.line(image, (x, y - 5), (x, y + 5), (255, 0, 0))
 	# 	cv2.imshow('img', image)
 	# 	cv2.waitKey(0)
+	# 	cv2.destroyAllWindows()
