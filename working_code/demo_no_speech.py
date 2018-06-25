@@ -7,7 +7,7 @@ import subprocess
 import FaceDetection as FD
 import math
 from GazeFollow import GazeNet as GNet
-from rbfNew import point_at_gazed
+from rbfNew import point
 
 
 nao_ip = "192.168.1.103"
@@ -172,21 +172,22 @@ def look_at_gazed(coords):
 
 
 def point_at_gazed(coords, cam):
-	# get the angles needed to look at the pointed object
-	# joint_angles = sendCoorGetAngl(coords)
-	if joint_angles == '':
-		tts_p.say("I do not understand where you are looking")
-	else:
-		# TODO check distinction between head angles and joint angles
-		joint_angles = list(joint_angles)
-		frame = 0 # motion_p.FRAME_TORSO
-		motion_p.positionInterpolations("Head", frame, joint_angles[:5], 7, 1.5)
-		arm_chain = choose_arm()
-		if find_circles(cam) is not None:
-			# FIXME pointing should only be done when the ball is in the expected position, not if any ball is in the visual fiels
-			motion_p.positionInterpolations(arm_chain, frame, joint_angles[6:], 7, 1.5)
-		else:
-			tts_p.say("I do not see the ball that you are looking at")
+	head_position = motion_p.getPosition('Head', 1, True)
+	r_arm_coor = point((coords, head_position), "./all_data/rbfweights.mat")
+
+	# if :
+	# 	tts_p.say("I do not understand where you are looking")
+	# else:
+	# 	# TODO check distinction between head angles and joint angles
+	# 	joint_angles = list(joint_angles)
+	# 	frame = 0 # motion_p.FRAME_TORSO
+	# 	motion_p.positionInterpolations("Head", frame, joint_angles[:5], 7, 1.5)
+	# 	arm_chain = choose_arm()
+	# 	if find_circles(cam) is not None:
+	# 		# FIXME pointing should only be done when the ball is in the expected position, not if any ball is in the visual fiels
+	# 		motion_p.positionInterpolations(arm_chain, frame, joint_angles[6:], 7, 1.5)
+	# 	else:
+	# 		tts_p.say("I do not see the ball that you are looking at")
 
 def sendCoorGetAngl(coords):
 	# TODO check that MATLAB and python are writing and reading in the same way

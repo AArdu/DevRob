@@ -8,7 +8,7 @@ Created on Wed Jun 13 10:25:41 2018
 import scipy.io 
 import numpy as np
 
-filename = '/Users/gevelingbm/Downloads/rbfweights-2'
+# filename = '/Users/gevelingbm/Downloads/rbfweights-2'
 
 def point(coordinates, filename):
       
@@ -26,4 +26,4 @@ def point(coordinates, filename):
 
     return o_act
 
-movements = point((200,300), filename)
+# movements = point((200,300), filename)
