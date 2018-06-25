@@ -162,14 +162,14 @@ class GazeNet(Chain):
         """
         input_shape = [227, 227]
         alpha = 0.3
-        img = imread(img)
+        #img = imread(img)
         img_resize = None
         # height, width
         # crop of face (input 2)
         print("\nSize of the image is wy: {}, wx{}".format(img.shape[0], img.shape[1]))                                 # Delete this statement
         wy = int(alpha * img.shape[0])
         wx = int(alpha * img.shape[1])
-        center = [int(e[0] * img.shape[1]), int(e[1] * img.shape[0])]
+        center = [int(e[0][0] * img.shape[1]), int(e[0][1] * img.shape[0])]
         y1 = int(center[1] - .5 * wy) - 1
         y2 = int(center[1] + .5 * wy) - 1
         x1 = int(center[0] - .5 * wx) - 1

@@ -5,10 +5,12 @@ import cv2, time, sys, StringIO, json, httplib, wave, pprint
 import random
 import subprocess
 import FaceDetection as FD
+import math
 from GazeFollow import GazeNet as GNet
+from rbfNew import point_at_gazed
 
 
-nao_ip = "192.168.1.124"
+nao_ip = "192.168.1.103"
 nao_port = 9559
 
 #motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p = None
@@ -98,70 +100,80 @@ def follow_gaze(cam, GazeNet):
 		img = get_remote_image(cam)
 		fd = FD.FaceDetector(img, True)
 		center_of_face = fd.detectCenterFaces()
-		if len(e) > 0:
+		if len(center_of_face) > 0:
 			# get gaze directions
 			gaze_coords = GazeNet.getGaze(center_of_face, img)
+			cv2.circle(img, (gaze_coords[0], gaze_coords[1]), 10, (0,0,255))
+			cv2.imshow("Image", img)
+			cv2.waitKey(0)
+			cv2.destroyAllWindows()
 			# use gaze directions to look and point in that direction
 			# gaze predicted location
 			look_at_gazed(gaze_coords)
+			time.sleep(1.5)
 			# detect object
 			closest_ball = find_closest_object(cam)
-          if closest_ball is None: 
-          #TODO: Let is say it, and maybe look bakc at parent and/or try again
-              print("I don't see what you are looking at")
+			if closest_ball is None:
+			#TODO: Let is say it, and maybe look bakc at parent and/or try again
+				print("I don't see what you are looking at")
 			# if detected:
-          # TODO: set a maximum distance.   
-          if closest_ball is not None: 
-              look_at_gazed(closest_ball)
+			# TODO: set a maximum distance.
+			if closest_ball is not None:
+				look_at_gazed(closest_ball)
+				point_at_gazed(gaze_coords, cam)
 			# gaze object
 			# point
 
-			point_at_gazed(gaze_coords, cam)
+
 
 def find_closest_object(cam):
-    circles = find_circles(cam)
-    centers = {}
-    centers['coords'] = []
-    centers['dist'] = []
-    if circles['pink'] is not None: 
-        for center in circles['pink']['centers']:
-            centers['coords'].append(center)
-    if circles['blue'] is not None: 
-        for center in circles['blue']['centers']:
-            centers['coords'].append(center)
-    if circles['green'] is not None: 
-        for center in circles['green']['centers']:
-            centers['coords'].append(center)
-    if circles['yellow'] is not None: 
-        for center in circles['yellow']['centers']:
-            centers['coords'].append(center)
-    
-    if centers['coords'] is not None:     
-        for center in centers['coords']:
-           centers['dist'].append(np.sqrt((center[0]-320)**2+(center[1]-240)**2))
-        
-        closest = np.argmin(centers['dist'])
-        if len(closest)>1:
-            closest = closest[0]
-            closest_ball = centers['coords'][closest]
-        return closest_ball
-    else:
-        return None
+	circles = find_circles(cam)
+	centers = {}
+	centers['coords'] = []
+	centers['dist'] = []
+	if circles['pink'] is not None:
+		for center in circles['pink']['centers']:
+			centers['coords'].append(center)
+	if circles['blue'] is not None:
+		for center in circles['blue']['centers']:
+			centers['coords'].append(center)
+	if circles['green'] is not None:
+		for center in circles['green']['centers']:
+			centers['coords'].append(center)
+	if circles['yellow'] is not None:
+		for center in circles['yellow']['centers']:
+			centers['coords'].append(center)
+
+	if centers['coords'] is not None:
+		for center in centers['coords']:
+			centers['dist'].append(np.sqrt((center[0]-320)**2+(center[1]-240)**2))
+		closest = np.argmin(centers['dist'])
+		if closest.dtype == list:
+			closest = closest[0]
+		closest_ball = centers['coords'][closest]
+		return [closest_ball[0], closest_ball[1]]
+	else:
+		return None
     
 
 def look_at_gazed(coords):
-	coords[0] = coords[0]- 320
-	coords[1]= coords[1]-240
+	coords[0] = coords[0] - 320
+	coords[1]= coords[1] - 240
 
-	x_angle = coords[0]/640*60.97
-	y_angle = coords[1]/480*47.64
-
-	motion_p.angleInterpolation(["HeadYaw", "HeadPitch"], [x_angle, y_angle], [1.5, 1.5], False)
+	x_angle = -(coords[0]/640.*60.97*math.pi/180)
+	y_angle = coords[1]/480.*47.64*math.pi/180
+	current_head_yaw = motion_p.getAngles("HeadYaw", True)[0]
+	current_head_pitch = motion_p.getAngles("HeadPitch", True)[0]
+	max_yaw = 2.0857 - current_head_yaw
+	max_pitch = 0.5149 - current_head_pitch
+	min_yaw = -2.0857 - current_head_yaw
+	min_pitch = -0.6720 - current_head_pitch
+	motion_p.angleInterpolation(["HeadYaw", "HeadPitch"], [max(min_yaw, min(max_yaw, x_angle)), max(min_pitch, min(max_pitch, y_angle))], [1.5, 1.5], False)
 
 
 def point_at_gazed(coords, cam):
 	# get the angles needed to look at the pointed object
-	joint_angles = sendCoorGetAngl(coords)
+	# joint_angles = sendCoorGetAngl(coords)
 	if joint_angles == '':
 		tts_p.say("I do not understand where you are looking")
 	else:
@@ -179,8 +191,8 @@ def point_at_gazed(coords, cam):
 def sendCoorGetAngl(coords):
 	# TODO check that MATLAB and python are writing and reading in the same way
 	# write coordinate data to file read by 64 bit environment
-	with open("./all_data/centers_read.txt", 'w+') as fc:
-		fc.write(coords)
+	# with open("./all_data/centers_read.txt", 'w+') as fc:
+	# 	fc.write(coords)
 
 	counter = 0
 	tts_p.say("I'm going to guess where your gaze is pointing")
@@ -362,7 +374,7 @@ def pointRandom():
 
 
 if __name__ == "__main__":
-	try:
+	# try:
 		try:
 			# create proxies
 			global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
@@ -378,9 +390,9 @@ if __name__ == "__main__":
 			print("Error while creating proxies:")
 			print(str(e))
 			sys.exit(0)
-		matlab = subprocess.Popen(["C:\\Users\\univeristy\\Anaconda3\\python.exe", "py64environment.py"])
+		# matlab = subprocess.Popen(["C:\\Users\\univeristy\\Anaconda3\\python.exe", "py64environment.py"])
 		GazeNet = GNet()
-		GazeNet = GazeNet.loadWeights("all_data\\train_GazeFollow\\binary_w.npz")
+		GazeNet = GazeNet.loadWeights("all_data/train_GazeFollow/binary_w.npz")
 
 		motion_p.wakeUp()
 		Speecher = SpeechRecognition("Speecher")
@@ -412,9 +424,9 @@ if __name__ == "__main__":
 		posture_p.goToPosture("Sit", 0.7)
 		motion_p.rest()
 		broker.shutdown()
-	except Exception , e:
-		print("Error in __main__", e)
-		# posture_p.goToPosture("Sit", 0.7)
-		motion_p.rest()
-		broker.shutdown()
-		sys.exit(0)
+	# except Exception , e:
+	# 	print("Error in __main__", e)
+	# 	# posture_p.goToPosture("Sit", 0.7)
+	# 	motion_p.rest()
+	# 	broker.shutdown()
+	# 	sys.exit(0)
