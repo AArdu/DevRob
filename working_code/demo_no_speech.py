@@ -105,12 +105,49 @@ def follow_gaze(cam, GazeNet):
 			# gaze predicted location
 			look_at_gazed(gaze_coords)
 			# detect object
-			
+			closest_ball = find_closest_object(cam)
+          if closest_ball is None: 
+          #TODO: Let is say it, and maybe look bakc at parent and/or try again
+              print("I don't see what you are looking at")
 			# if detected:
+          # TODO: set a maximum distance.   
+          if closest_ball is not None: 
+              look_at_gazed(closest_ball)
 			# gaze object
 			# point
 
 			point_at_gazed(gaze_coords, cam)
+
+def find_closest_object(cam):
+    circles = find_circles(cam)
+    centers = {}
+    centers['coords'] = []
+    centers['dist'] = []
+    if circles['pink'] is not None: 
+        for center in circles['pink']['centers']:
+            centers['coords'].append(center)
+    if circles['blue'] is not None: 
+        for center in circles['blue']['centers']:
+            centers['coords'].append(center)
+    if circles['green'] is not None: 
+        for center in circles['green']['centers']:
+            centers['coords'].append(center)
+    if circles['yellow'] is not None: 
+        for center in circles['yellow']['centers']:
+            centers['coords'].append(center)
+    
+    if centers['coords'] is not None:     
+        for center in centers['coords']:
+           centers['dist'].append(np.sqrt((center[0]-320)**2+(center[1]-240)**2))
+        
+        closest = np.argmin(centers['dist'])
+        if len(closest)>1:
+            closest = closest[0]
+            closest_ball = centers['coords'][closest]
+        return closest_ball
+    else:
+        return None
+    
 
 def look_at_gazed(coords):
 	coords[0] = coords[0]- 320
