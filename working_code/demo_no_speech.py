@@ -152,22 +152,10 @@ def follow_gaze(cam, GazeNet):
 def find_closest_object(cam):
 	circles = find_circles(cam)
 	centers = {}
-	centers['coords'] = []
+	centers['coords'] = circles['centers']
 	centers['dist'] = []
-	if circles['pink'] is not None:
-		for center in circles['pink']['centers']:
-			centers['coords'].append(center)
-	if circles['blue'] is not None:
-		for center in circles['blue']['centers']:
-			centers['coords'].append(center)
-	if circles['green'] is not None:
-		for center in circles['green']['centers']:
-			centers['coords'].append(center)
-	if circles['yellow'] is not None:
-		for center in circles['yellow']['centers']:
-			centers['coords'].append(center)
 
-	if len(centers['coords']) > 0:
+	if len(circles) > 0:
 		for center in centers['coords']:
 			centers['dist'].append(np.sqrt((center[0]-320)**2+(center[1]-240)**2))
 		closest = np.argmin(centers['dist'])
@@ -289,55 +277,43 @@ def get_remote_image(cam):
 	return image
 
 
-def get_colored_circle(img, l_thr, u_thr):
-	"""Applies color thresholds to find circles within that range"""
-	out_img = img.copy()
+def get_hough_circle(img):
+	"""Applies circle detection"""
 	circ_dict = {}
+	cimg = img.copy()
 
-	hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-	c_mask = cv2.inRange(hsv_image, l_thr, u_thr)
-	c_image = cv2.bitwise_and(img, img, mask = c_mask)
-	kernel = np.ones((9,9), np.uint8)
-	opening_c = cv2.morphologyEx(c_mask, cv2.MORPH_OPEN, kernel)
-	closing_c = cv2.morphologyEx(opening_c, cv2.MORPH_CLOSE, kernel)
+	# Preprocess image
+	img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+	img[:, :, 2] = [[max(pixel - 25, 0) if pixel < 190 else min(pixel + 25, 255) for pixel in row] for row in img[:, :, 2]]
+	img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+	img = cv2.medianBlur(img, 11)
 
-	smoothened_mask = cv2.GaussianBlur(closing_c, (9,9), 0)
-	c_image = cv2.bitwise_and(img, img, mask = smoothened_mask)
-	gray_c = c_image[:,:,2]
-	circles = cv2.HoughCircles(gray_c,
-		cv2.HOUGH_GRADIENT,		# method of detection
-		1,						#
-		50,						# minimum distance between circles
-		param1 = 50,			#
-		param2 = 30,			# accumulator threshold :
-		minRadius = 5,			# minimum radius
-		maxRadius = 100			# maximum radius
-		)
+	# Hough detection for circles
+	circles = cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 25, param1=50, param2=30, minRadius=7, maxRadius=50)
+
+	print("get_hough_circles found {} circles!".format(len(circles)))
+	print(circles)
 
 	if circles is not None:
-		print("Circles detected!")
-
-		circles = np.round(circles[0, :]).astype("int")
-		circ_dict['centers'] =  []
+		circles = np.uint16(np.around(circles))
+		circ_dict['centers'] = []
 		circ_dict['radii'] = []
-
-		for i in circles:
-			# draw he circumference
-			cv2.circle(out_img,(i[0],i[1]),i[2],(0,255,0),2)
-			# draw center of detected circle
-			cv2.circle(out_img,(i[0],i[1]),2,(0,0,255),-1)
-
+		for i in circles[0, :]:
+			# draw the outer circle
+			cv2.circle(cimg, (i[0], i[1]), i[2], (0, 255, 0), 2)
+			# draw the center of the circle
+			cv2.circle(cimg, (i[0], i[1]), 2, (0, 0, 255), 3)
+			# paste center and radius info to dict
 			circ_dict['centers'].append((i[0], i[1]))
 			circ_dict['radii'].append(i[2])
 
 	else:
-		cv2.imshow("Detected circles", out_img)
+		cv2.imshow("Detected circles", cimg)
 		cv2.waitKey(1)
 		return None
 
-
-	cv2.imshow("Detected circles", out_img)
-	cv2.waitKey(1)
+	cv2.imshow("Detected circles", cimg)
+	cv2.waitKey(0)
 	return circ_dict
 
 
@@ -346,42 +322,20 @@ def find_circles(cam):
 	try:
 		# get image
 		cimg = get_remote_image(cam)
-
 	except Exception, e:
 		print("Error while getting remote image:", e)
 		print("Attempting new cam connection...")
 		cam = connect_new_cam()
 		find_circles(cam)
-
-	detected_circles = {}
-
 	image = cimg.copy()
-
-
-	# threshold for blue
-	l_blue = np.array([95, 50, 50])
-	u_blue = np.array([115, 255, 255])
-	detected_circles['blue'] = get_colored_circle(image, l_blue, u_blue)
-
-	# threshold for green
-	l_green = np.array([45, 50, 50])
-	u_green = np.array([65, 255, 255])
-	detected_circles['green'] = get_colored_circle(image, l_green, u_green)
-
-	# threshold for yellow
-	l_yellow = np.array([25, 50, 50])
-	u_yellow = np.array([35, 255, 255])
-	detected_circles['yellow'] = get_colored_circle(image, l_yellow, u_yellow)
-
-	# threshold for pink
-	l_pink = np.array([150, 50, 50])
-	u_pink = np.array([180, 255, 255])
-	detected_circles['pink'] = get_colored_circle(image, l_pink, u_pink)
-
-	if sum([detected_circles[k] == None for k in detected_circles.keys()]) == 0:
+	detected_circles = get_hough_circle(image)
+	print(detected_circles)
+	if sum([len(detected_circles[k]) for k in detected_circles.keys()]) == 0:
+		print("Sum is zero")
 		return None
-
+	print("\nPassing the following detected circles \n{}".format(detected_circles))
 	return detected_circles
+
 
 def pointRandom():
 	# motionProxy = ALProxy('ALMotion')
