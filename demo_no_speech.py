@@ -17,7 +17,6 @@ import matlab.engine as MATLAB
 import naoqi
 from GazeFollow import GazeNet as GNet
 from naoqi import ALBroker, ALModule, ALProxy
-from rbfNew import point
 
 nao_ip = "192.168.1.144"
 nao_port = 9559
