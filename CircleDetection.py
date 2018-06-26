@@ -7,6 +7,9 @@ nao_port = 9559
 
 
 def circle_detect(img):
+    """
+    Detect all circles in the image
+    """
     cimg = img.copy()
     cv2.imshow('Original', cimg)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)

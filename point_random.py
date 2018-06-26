@@ -1,14 +1,23 @@
-import cv2, time, sys, StringIO, json, httplib, wave, pprint, os, random, json
-from naoqi import ALProxy, ALModule, ALBroker
+import httplib
+import json
+import os
+import pprint
+import random
+import StringIO
+import sys
+import time
+import wave
+
+import cv2
 import numpy as np
 
-# Marvin: 137
-# Naomi: 103\
-#
+from naoqi import ALBroker, ALModule, ALProxy
+
 nao_ip = "169.254.199.32"
 nao_port = 9559
 
 global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
+
 
 def get_colored_circle(img, l_thr, u_thr):
     """Applies color thresholds to find circles within that range"""
@@ -17,57 +26,50 @@ def get_colored_circle(img, l_thr, u_thr):
 
     hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     c_mask = cv2.inRange(hsv_image, l_thr, u_thr)
-    c_image = cv2.bitwise_and(img, img, mask = c_mask)
-    kernel = np.ones((9,9), np.uint8)
+    c_image = cv2.bitwise_and(img, img, mask=c_mask)
+    kernel = np.ones((9, 9), np.uint8)
     opening_c = cv2.morphologyEx(c_mask, cv2.MORPH_OPEN, kernel)
     closing_c = cv2.morphologyEx(opening_c, cv2.MORPH_CLOSE, kernel)
 
-    smoothened_mask = cv2.GaussianBlur(closing_c, (9,9), 0)
-    c_image = cv2.bitwise_and(img, img, mask = smoothened_mask)
-    gray_c = c_image[:,:,2]
+    smoothened_mask = cv2.GaussianBlur(closing_c, (9, 9), 0)
+    c_image = cv2.bitwise_and(img, img, mask=smoothened_mask)
+    gray_c = c_image[:, :, 2]
     circles = cv2.HoughCircles(gray_c,
-        cv2.HOUGH_GRADIENT,        # method of detection
-        1,                        #
-        50,                        # minimum distance between circles
-        param1 = 50,            #
-        param2 = 30,            # accumulator threshold :
-        minRadius = 5,            # minimum radius
-        maxRadius = 100            # maximum radius
-        )
+                               cv2.HOUGH_GRADIENT,        # method of detection
+                               1,                        #
+                               50,                        # minimum distance between circles
+                               param1=50,            #
+                               param2=30,            # accumulator threshold :
+                               minRadius=5,            # minimum radius
+                               maxRadius=100            # maximum radius
+                               )
 
     if circles is not None:
         print("Circles detected!")
 
         circles = np.round(circles[0, :]).astype("int")
-        circ_dict['centers'] =  []
-        # circ_dict['radii'] = []
+        circ_dict['centers'] = []
 
         for i in circles:
             # draw he circumference
-            cv2.circle(out_img,(i[0],i[1]),i[2],(0,255,0),2)
+            cv2.circle(out_img, (i[0], i[1]), i[2], (0, 255, 0), 2)
             # draw center of detected circle
-            cv2.circle(out_img,(i[0],i[1]),2,(0,0,255),-1)
+            cv2.circle(out_img, (i[0], i[1]), 2, (0, 0, 255), -1)
 
             circ_dict['centers'].append((i[0], i[1]))
-            # circ_dict['radii'].append(i[2])
 
     else:
-        # cv2.imshow("Detected circles", out_img)
-        # cv2.waitKey(0)
         return None
-
-
-    # cv2.imshow("Detected circles", out_img)
-    # cv2.waitKey(0)
     return circ_dict
 
+
 def connect_new_cam(
-    cam_name = "TeamPiagetsCam",
-    cam_type = 0, # 0 is the upper one
-    res = 2, # resolution
-    colspace = 13, # BGR
-    fps = 10 # frames per second
-    ):
+    cam_name="TeamPiagetsCam",
+    cam_type=0,  # 0 is the upper one
+    res=2,  # resolution
+    colspace=13,  # BGR
+    fps=10  # frames per second
+):
     """Breaks all previous connections with the webcam andcreates a new one"""
     try:
         cams = video_p.getSubscribers()
@@ -78,7 +80,7 @@ def connect_new_cam(
         cam = video_p.subscribeCamera(cam_name, cam_type, res, colspace, fps)
         return cam
     except Exception, e:
-        print("Error while subscribing a new camera:" , e)
+        print("Error while subscribing a new camera:", e)
 
 
 def get_remote_image(cam):
@@ -95,30 +97,32 @@ def get_remote_image(cam):
 
 
 def pointRandom():
-      # motionProxy = ALProxy('ALMotion')
-      armJoints = [('HeadYaw', -1.5708, 0),
-               ('HeadPitch', -0.200015, 0.200015),
-               ('RShoulderRoll', -1.3265, 0.3142),
-               ('RShoulderPitch', -0.785398, 0.785398)]
+    # motionProxy = ALProxy('ALMotion')
+    armJoints = [('HeadYaw', -1.5708, 0),
+                 ('HeadPitch', -0.200015, 0.200015),
+                 ('RShoulderRoll', -1.3265, 0.3142),
+                 ('RShoulderPitch', -0.785398, 0.785398)]
 
-      angles = []
-      arm_pos = []
-      head_pos = []
-      arm = "RArm"
-      head = "Head"
-      frame = motion_p.FRAME_TORSO
-      useSensorValues = True
+    angles = []
+    arm_pos = []
+    head_pos = []
+    arm = "RArm"
+    head = "Head"
+    frame = motion_p.FRAME_TORSO
+    useSensorValues = True
 
-      for joint in armJoints:
-          angle = random.uniform(joint[1], joint[2])
-          angles.append((joint[0], angle))
-          motion_p.angleInterpolation([joint[0]], [angle], [2.0], True)# (joint[0], angle, 0.1)
-          a = motion_p.getPosition(arm, 0, useSensorValues)
-          arm_pos.append(a)
-          h = motion_p.getPosition(head, 0, useSensorValues)
-          head_pos.append(h)
+    for joint in armJoints:
+        angle = random.uniform(joint[1], joint[2])
+        angles.append((joint[0], angle))
+        motion_p.angleInterpolation(
+            [joint[0]], [angle], [2.0], True)  # (joint[0], angle, 0.1)
+        a = motion_p.getPosition(arm, 0, useSensorValues)
+        arm_pos.append(a)
+        h = motion_p.getPosition(head, 0, useSensorValues)
+        head_pos.append(h)
 
-      return angles, head_pos, arm_pos
+    return angles, head_pos, arm_pos
+
 
 def find_circles(cam):
     """Inspect the image captured by the NAO's cam and finds colored circles"""
@@ -145,7 +149,6 @@ def find_circles(cam):
 
 
 if __name__ == "__main__":
-    # try:
     try:
         # create proxies
         motion_p = ALProxy("ALMotion", nao_ip, nao_port)
@@ -162,7 +165,6 @@ if __name__ == "__main__":
         print(str(e))
         sys.exit(0)
 
-
     motion_p.wakeUp()
     posture_p.goToPosture("Stand", 0.5)
     cam = connect_new_cam()
@@ -172,7 +174,7 @@ if __name__ == "__main__":
     circles_joints["joints"] = []
     circles_joints["head_pos"] = []
     circles_joints["arm_pos"] = []
-                
+
     motion_p.setAngles(["RElbowRoll", "RWristYaw"], [0.0349, -1.8238], 0.3)
     i = 0
     while i < 225:
@@ -181,16 +183,15 @@ if __name__ == "__main__":
         if circles['pink'] is not None:
             if len(circles['pink']['centers']) == 1:
                 print("Pink ball #{} detected".format(i))
-                # image = get_remote_image(cam)
-                # cv2.imwrite("./arm_images/pointing_{}.png".format(i), image)
+
                 circles_joints["circles"].append(circles['pink']['centers'])
                 circles_joints["joints"].append(angles)
                 circles_joints["head_pos"].append(head_pos)
                 circles_joints["arm_pos"].append(arm_pos)
-                
 
                 i += 1
-        if i % 8  == 0 and i != 0:
+        if i % 8 == 0 and i != 0:
+            # set the stiffness to 0 to avoid overheating
             with open('./data.json', 'w+') as fp:
                 json.dump(circles_joints, fp)
             print("I'm going to rest for a bit.")
@@ -199,17 +200,9 @@ if __name__ == "__main__":
             time.sleep(200)
             motion_p.wakeUp()
 
-
     print circles_joints
 
     posture_p.goToPosture("Sit", 0.3)
     motion_p.rest()
     broker.shutdown()
     sys.exit(0)
-
-    # except Exception , e:
-    #     print("Error in __main__", e)
-    #     posture_p.goToPosture("Stand", 0.7)
-    #     motion_p.rest()
-    #     broker.shutdown()
-    #     sys.exit(0)

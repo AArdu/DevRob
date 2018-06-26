@@ -5,23 +5,23 @@ Created on Sat Jun  2 12:37:45 2018
 @author: Saskia van der Wegen
 """
 import os
-import time
-from skimage.io import imread
-import matplotlib.pyplot as plt
-import scipy.io as sio
-from scipy.misc import imresize as resize
-from matplotlib.patches import Circle
 import sys
+import time
+
 import chainer
 import chainer.functions as F
 import chainer.links as L
+import chainer.serializers.npz as npz
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.io as sio
 from chainer import Chain, training
+from matplotlib.patches import Circle
+from scipy.misc import imresize as resize
+from skimage.io import imread
 from skimage.transform import resize as imresize
-import chainer.serializers.npz as npz
 
 # we hebben nodig:  data wat de foto is van 1x3x227x227
 #                   data foto van het hoofd: ook 1x3x227x227
@@ -30,64 +30,94 @@ import chainer.serializers.npz as npz
 
 class GazeNet(Chain):
     def __init__(self):
-         super(GazeNet, self).__init__()
-         with self.init_scope():
+        super(GazeNet, self).__init__()
+        with self.init_scope():
             # this are the layers that use the full picture
-            self.conv1 = L.Convolution2D(in_channels = None, out_channels=96, ksize=11, stride=4, initialW = chainer.initializers.Normal(0.01), initial_bias = 0)
-            self.conv2 = L.Convolution2D(in_channels = None,out_channels = 256, pad = 2, ksize = 5, groups = 2, initialW = chainer.initializers.Normal(0.01), initial_bias=0.1)
-            self.conv3 = L.Convolution2D(in_channels = None,out_channels = 384, pad = 1, ksize = 3, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
-            self.conv4 = L.Convolution2D(in_channels = None,out_channels = 384, pad = 1, ksize = 3, groups = 2, initialW = chainer.initializers.Normal(0.01), initial_bias=0.1)
-            self.conv5 = L.Convolution2D(in_channels = None,out_channels = 256, pad = 1, ksize = 3, groups = 2, initialW = chainer.initializers.Normal(0.01), initial_bias=0.1)
-            self.conv5_red = L.Convolution2D(in_channels = None,out_channels = 1, ksize = 1, initialW = chainer.initializers.Normal(0.01), initial_bias=1)
+            self.conv1 = L.Convolution2D(in_channels=None, out_channels=96, ksize=11,
+                                         stride=4, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.conv2 = L.Convolution2D(in_channels=None, out_channels=256, pad=2, ksize=5,
+                                         groups=2, initialW=chainer.initializers.Normal(0.01), initial_bias=0.1)
+            self.conv3 = L.Convolution2D(in_channels=None, out_channels=384, pad=1,
+                                         ksize=3, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.conv4 = L.Convolution2D(in_channels=None, out_channels=384, pad=1, ksize=3,
+                                         groups=2, initialW=chainer.initializers.Normal(0.01), initial_bias=0.1)
+            self.conv5 = L.Convolution2D(in_channels=None, out_channels=256, pad=1, ksize=3,
+                                         groups=2, initialW=chainer.initializers.Normal(0.01), initial_bias=0.1)
+            self.conv5_red = L.Convolution2D(
+                in_channels=None, out_channels=1, ksize=1, initialW=chainer.initializers.Normal(0.01), initial_bias=1)
             # now the layers that use the picture of the face
-            self.conv1_face = L.Convolution2D(in_channels = None,out_channels = 96, ksize = 11, stride = 4, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
-            self.conv2_face = L.Convolution2D(in_channels = None,out_channels = 256, pad = 2, ksize = 5, groups = 2, initialW = chainer.initializers.Normal(0.01), initial_bias=0.1)
-            self.conv3_face = L.Convolution2D(in_channels = None,out_channels = 384, pad = 1, ksize = 3, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
-            self.conv4_face = L.Convolution2D(in_channels = None,out_channels = 384, pad = 1, ksize = 3, groups = 2, initialW = chainer.initializers.Normal(0.01), initial_bias=0.1)
-            self.conv5_face = L.Convolution2D(in_channels = None,out_channels = 256, pad = 1, ksize = 3, groups = 2, initialW = chainer.initializers.Normal(0.01), initial_bias=0.1)
-            self.fc6_face = L.Linear(None, out_size =500, initialW = chainer.initializers.Normal(0.01), initial_bias=0.5)
+            self.conv1_face = L.Convolution2D(
+                in_channels=None, out_channels=96, ksize=11, stride=4, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.conv2_face = L.Convolution2D(in_channels=None, out_channels=256, pad=2,
+                                              ksize=5, groups=2, initialW=chainer.initializers.Normal(0.01), initial_bias=0.1)
+            self.conv3_face = L.Convolution2D(
+                in_channels=None, out_channels=384, pad=1, ksize=3, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.conv4_face = L.Convolution2D(in_channels=None, out_channels=384, pad=1,
+                                              ksize=3, groups=2, initialW=chainer.initializers.Normal(0.01), initial_bias=0.1)
+            self.conv5_face = L.Convolution2D(in_channels=None, out_channels=256, pad=1,
+                                              ksize=3, groups=2, initialW=chainer.initializers.Normal(0.01), initial_bias=0.1)
+            self.fc6_face = L.Linear(
+                None, out_size=500, initialW=chainer.initializers.Normal(0.01), initial_bias=0.5)
             # other layers
-            self.fc7_face = L.Linear(None,out_size =400, initialW = chainer.initializers.Normal(0.01), initial_bias=0.5)
-            self.fc8_face = L.Linear(None,out_size =200, initialW = chainer.initializers.Normal(0.01), initial_bias=0.5)
-            self.importance_no_sigmoid = L.Linear(None,out_size =169, initialW = chainer.initializers.Normal(0.01), nobias = True)
-            self.importance_map = L.Convolution2D(in_channels = None,out_channels = 1, pad = 1, ksize = 3, stride=1, initialW = chainer.initializers.Zero(), initial_bias=0)
-            self.fc_0_0 = L.Linear(None,out_size =25, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
-            self.fc_1_0 = L.Linear(None,out_size =25, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
-            self.fc_m1_0 = L.Linear(None,out_size =25, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
-            self.fc_0_1 = L.Linear(None,out_size =25, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
-            self.fc_0_m1 = L.Linear(None,out_size =25, initialW = chainer.initializers.Normal(0.01), initial_bias=0)
+            self.fc7_face = L.Linear(
+                None, out_size=400, initialW=chainer.initializers.Normal(0.01), initial_bias=0.5)
+            self.fc8_face = L.Linear(
+                None, out_size=200, initialW=chainer.initializers.Normal(0.01), initial_bias=0.5)
+            self.importance_no_sigmoid = L.Linear(
+                None, out_size=169, initialW=chainer.initializers.Normal(0.01), nobias=True)
+            self.importance_map = L.Convolution2D(
+                in_channels=None, out_channels=1, pad=1, ksize=3, stride=1, initialW=chainer.initializers.Zero(), initial_bias=0)
+            self.fc_0_0 = L.Linear(
+                None, out_size=25, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.fc_1_0 = L.Linear(
+                None, out_size=25, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.fc_m1_0 = L.Linear(
+                None, out_size=25, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.fc_0_1 = L.Linear(
+                None, out_size=25, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
+            self.fc_0_m1 = L.Linear(
+                None, out_size=25, initialW=chainer.initializers.Normal(0.01), initial_bias=0)
 
     def __call__(self, data, face, eyes_grid):
         # the network that uses data as input
-        pool1 = F.max_pooling_2d(F.relu(self.conv1(data)), ksize = 3, stride = 2)
-        norm1 = F.local_response_normalization(pool1, n = 5, alpha = 0.0001, beta = 0.75)
-        pool2 = F.max_pooling_2d(F.relu(self.conv2(norm1)), ksize = 3, stride = 2)
-        norm2 = norm1 = F.local_response_normalization(pool2, n = 5, alpha = 0.0001, beta = 0.75)
+        pool1 = F.max_pooling_2d(F.relu(self.conv1(data)), ksize=3, stride=2)
+        norm1 = F.local_response_normalization(
+            pool1, n=5, alpha=0.0001, beta=0.75)
+        pool2 = F.max_pooling_2d(F.relu(self.conv2(norm1)), ksize=3, stride=2)
+        norm2 = norm1 = F.local_response_normalization(
+            pool2, n=5, alpha=0.0001, beta=0.75)
         conv3 = F.relu(self.conv3(norm2))
         conv4 = F.relu(self.conv4(conv3))
         conv5 = F.relu(self.conv5(conv4))
         conv5_red = F.relu(self.conv5_red(conv5))
 
         # the network that uses face as input
-        pool1_face = F.max_pooling_2d(F.relu(self.conv1_face(face)), ksize = 3, stride = 2)
-        norm1_face = F.local_response_normalization(pool1_face, n = 5, alpha = 0.0001, beta = 0.75)
-        pool2_face = F.max_pooling_2d(F.relu(self.conv2_face(norm1_face)), ksize = 3, stride=2)
-        norm2_face = F.local_response_normalization(pool2_face, n=5, alpha=0.0001, beta= 0.75)
+        pool1_face = F.max_pooling_2d(
+            F.relu(self.conv1_face(face)), ksize=3, stride=2)
+        norm1_face = F.local_response_normalization(
+            pool1_face, n=5, alpha=0.0001, beta=0.75)
+        pool2_face = F.max_pooling_2d(
+            F.relu(self.conv2_face(norm1_face)), ksize=3, stride=2)
+        norm2_face = F.local_response_normalization(
+            pool2_face, n=5, alpha=0.0001, beta=0.75)
         conv3_face = F.relu(self.conv3_face(norm2_face))
         conv4_face = F.relu(self.conv4_face(conv3_face))
-        pool5_face = F.max_pooling_2d(F.relu(self.conv5_face(conv4_face)), ksize=3, stride = 2)
+        pool5_face = F.max_pooling_2d(
+            F.relu(self.conv5_face(conv4_face)), ksize=3, stride=2)
         fc6_face = F.relu(self.fc6_face(pool5_face))
 
         # now the eyes
         eyes_grid_flat = F.flatten(eyes_grid)
-        eyes_grid_mult = 24*eyes_grid_flat
-        eyes_grid_reshaped = F.reshape(eyes_grid_mult,(1,eyes_grid_mult.size))  # give it same ndim as fc6
+        eyes_grid_mult = 24 * eyes_grid_flat
+        eyes_grid_reshaped = F.reshape(
+            eyes_grid_mult, (1, eyes_grid_mult.size))  # give it same ndim as fc6
 
         # now bring everything together
         face_input = F.concat((fc6_face, eyes_grid_reshaped), axis=1)
         fc7_face = F.relu(self.fc7_face(face_input))
         fc8_face = F.relu(self.fc8_face(fc7_face))
-        importance_map_reshape = F.reshape(F.sigmoid(self.importance_no_sigmoid(fc8_face)), (1,1,13,13))
+        importance_map_reshape = F.reshape(
+            F.sigmoid(self.importance_no_sigmoid(fc8_face)), (1, 1, 13, 13))
         fc_7 = conv5_red * self.importance_map(importance_map_reshape)
         fc_0_0 = self.fc_0_0(fc_7)
         fc_1_0 = self.fc_1_0(fc_7)
@@ -98,6 +128,10 @@ class GazeNet(Chain):
         return {'fc_0_0': fc_0_0, 'fc_1_0': fc_1_0, 'fc_0_1': fc_0_1, 'fc_0_m1': fc_0_m1, 'fc_m1_0': fc_m1_0}
 
     def loadWeights(self, npz_path):
+        """
+        To avoid name errors due to the different way caffe and chainer (numpy)
+        deal with data, load the weights "manually"
+        """
         npz_f = np.load(npz_path)
         keys = ["arr_" + str(k_id) for k_id in range(len(npz_f.keys()))]
 
@@ -137,11 +171,12 @@ class GazeNet(Chain):
         self.conv3_face.b.data = npz_f[keys[16 + 1]]
         self.conv4_face.b.data = npz_f[keys[18 + 1]]
         self.conv5_face.b.data = npz_f[keys[20 + 1]]
-        self.fc6_face.b.data = npz_f[keys[22 +1]]
+        self.fc6_face.b.data = npz_f[keys[22 + 1]]
         # other layers
         self.fc7_face.b.data = npz_f[keys[24 + 1]]
         self.fc8_face.b.data = npz_f[keys[26 + 1]]
-        self.importance_no_sigmoid.b = chainer.variable.Parameter(npz_f[keys[28 + 1]])
+        self.importance_no_sigmoid.b = chainer.variable.Parameter(
+            npz_f[keys[28 + 1]])
         self.importance_map.b.data = npz_f[keys[30 + 1]]
         self.fc_0_0.b.data = npz_f[keys[32 + 1]]
         self.fc_1_0.b.data = npz_f[keys[34 + 1]]
@@ -166,7 +201,9 @@ class GazeNet(Chain):
         img_resize = None
         # height, width
         # crop of face (input 2)
-        print("\nSize of the image is wy: {}, wx{}".format(img.shape[0], img.shape[1]))                                 # Delete this statement
+        # Delete this statement
+        print("\nSize of the image is wy: {}, wx{}".format(
+            img.shape[0], img.shape[1]))
         wy = int(alpha * img.shape[0])
         wx = int(alpha * img.shape[1])
         center = [int(e[0][0] * img.shape[1]), int(e[0][1] * img.shape[0])]
@@ -195,7 +232,8 @@ class GazeNet(Chain):
         eye_image_resize = eye_image[:, :, [2, 1, 0]] - imagenet_mean
         eye_image_resize = np.rot90(np.fliplr(eye_image_resize))
         # get everything in the right input format for the network
-        img_resize, eye_image_resize = self.fit_shape_of_inputs(img_resize, eye_image_resize)
+        img_resize, eye_image_resize = self.fit_shape_of_inputs(
+            img_resize, eye_image_resize)
         z = self.eyeGrid(img, [x1, x2, y1, y2])
         z = z.astype('float32')
         return img, img_resize, eye_image_resize, z
@@ -205,13 +243,13 @@ class GazeNet(Chain):
         https://github.com/pieterwolfert/engagement-l2tor/blob/master/script/gaze_predict.py
 
         Fits the input for the forward pass."""
-        input_image_resize = img_resize.reshape([img_resize.shape[0], \
-                                                 img_resize.shape[1], \
+        input_image_resize = img_resize.reshape([img_resize.shape[0],
+                                                 img_resize.shape[1],
                                                  img_resize.shape[2], 1])
         input_image_resize = input_image_resize.transpose(3, 2, 0, 1)
 
-        eye_image_resize = eye_image_resize.reshape([eye_image_resize.shape[0], \
-                                                     eye_image_resize.shape[1], \
+        eye_image_resize = eye_image_resize.reshape([eye_image_resize.shape[0],
+                                                     eye_image_resize.shape[1],
                                                      eye_image_resize.shape[2], 1])
         eye_image_resize = eye_image_resize.transpose(3, 2, 0, 1)
         return input_image_resize, eye_image_resize
@@ -261,10 +299,10 @@ class GazeNet(Chain):
         f_m1_0 = F.reshape(fc_m1_0, (5, 5))
         f_0_1 = F.reshape(fc_0_1, (5, 5))
         f_0_m1 = F.reshape(fc_0_m1, (5, 5))
-        gaze_grid_list = [self.alpha_exponentiate(f_0_0.data), \
-                          self.alpha_exponentiate(f_1_0.data), \
-                          self.alpha_exponentiate(f_m1_0.data), \
-                          self.alpha_exponentiate(f_0_1.data), \
+        gaze_grid_list = [self.alpha_exponentiate(f_0_0.data),
+                          self.alpha_exponentiate(f_1_0.data),
+                          self.alpha_exponentiate(f_m1_0.data),
+                          self.alpha_exponentiate(f_0_1.data),
                           self.alpha_exponentiate(f_0_m1.data)]
         shifted_x = [0, 1, -1, 0, 0]
         shifted_y = [0, 0, 0, -1, 1]
@@ -299,7 +337,8 @@ class GazeNet(Chain):
         https://github.com/pieterwolfert/engagement-l2tor/blob/master/script/gaze_predict.py
         Python implementation of the equivalent matlab method"""
         rows = (ind / array_shape[1])
-        cols = (ind % array_shape[1])  # or numpy.mod(ind.astype('int'), array_shape[1])
+        # or numpy.mod(ind.astype('int'), array_shape[1])
+        cols = (ind % array_shape[1])
         return [rows, cols]
 
     def shifted_mapping(self, x, delta_x, is_topleft_corner):
@@ -330,11 +369,12 @@ class GazeNet(Chain):
         f_val = self.predictGaze(image_resize, head_image, head_loc)
         final_map, predictions = self.postProcessing(f_val)
         print("Predictions = {}".format(predictions))
-        print("Shape of the image is: X={}, Y={}".format(np.shape(image)[0], np.shape(image)[1]))
-        x = (1-predictions[0]) * np.shape(image)[1]
-        y = (1-predictions[1]) * np.shape(image)[0]
-        # x = predictions[0] * np.shape(image)[1]
-        # y = predictions[1] * np.shape(image)[0]
+        print("Shape of the image is: X={}, Y={}".format(
+            np.shape(image)[0], np.shape(image)[1]))
+        #x = (1-predictions[0]) * np.shape(image)[1]
+        #y = (1-predictions[1]) * np.shape(image)[0]
+        x = predictions[0] * np.shape(image)[1]
+        y = predictions[1] * np.shape(image)[0]
         x = int(x)
         y = int(y)
         return [x, y]
@@ -343,4 +383,3 @@ class GazeNet(Chain):
 if __name__ == "__main__":
     GN = GazeNet()
     GN.loadWeights("all_data/train_GazeFollow/binary_w.npz")
-
