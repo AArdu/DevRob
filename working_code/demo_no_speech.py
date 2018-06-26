@@ -78,20 +78,42 @@ def face_detection():
 	return None
 
 
-def center_face(face):
+def find_face(camera):
+	center_of_face = []
+	while len(center_of_face) == 0:
+		center_of_face = detect_face(camera)
+		if len(center_of_face) > 0:
+			center_face(center_of_face)
+		else:
+			move_head_randomly()
+			time.sleep(0.5)
+	if len(detect_face(camera)) > 0:
+		tts_p.say("I see a face.")
+	else:
+		tts_p("I thought I found your face but I seem to have lost it.")
+		find_face(camera)
+
+
+def detect_face(camera):
+	img = get_remote_image(camera)
+	fd = FD.FaceDetector(img, True)
+	return fd.detectCenterFaces()
+
+
+def center_face(center_of_face):
 	"""
 	Moves the head so that the first face
 	on the list is at the center of the visual field
 	"""
-	# pp = pprint.PrettyPrinter(indent=4)
-	# print(len(face))
-	# pp.pprint(face)
-	ShapeInfo = face[1][0][0]
-	cameraTorso = face[2]
-	alpha = ShapeInfo[1]
-	beta = ShapeInfo[2]
-	# TODO make it center the biggest (closest) face
-	motion_p.angleInterpolation(["HeadYaw","HeadPitch"], [alpha, beta], [1.5, 1.5], False)
+	center_of_face = [center_of_face[0][0] * 640., center_of_face[0][1] * 480.]
+	look_at_gazed(center_of_face)
+
+
+def move_head_randomly():
+	joint_list = ["HeadYaw", "HeadPitch"]
+	angle_list = [list(np.random.uniform(-0.8, 0.8, 1)), list(np.random.uniform(-0.6, 0.6, 1))]
+	times = [[1.25], [1.25]]
+	motion_p.angleInterpolation(joint_list, angle_list, times, True)
 
 
 def follow_gaze(cam, GazeNet):
@@ -116,6 +138,7 @@ def follow_gaze(cam, GazeNet):
 			if closest_ball is None:
 			#TODO: Let is say it, and maybe look bakc at parent and/or try again
 				print("I don't see what you are looking at")
+				tts_p.say("I don't see what you are looking at")
 			# if detected:
 			# TODO: set a maximum distance.
 			if closest_ball is not None:
@@ -144,7 +167,7 @@ def find_closest_object(cam):
 		for center in circles['yellow']['centers']:
 			centers['coords'].append(center)
 
-	if centers['coords'] is not None:
+	if len(centers['coords']) > 0:
 		for center in centers['coords']:
 			centers['dist'].append(np.sqrt((center[0]-320)**2+(center[1]-240)**2))
 		closest = np.argmin(centers['dist'])
@@ -172,7 +195,7 @@ def look_at_gazed(coords):
 
 
 def point_at_gazed(coords, cam):
-	head_position = motion_p.getPosition('Head', 1, True)
+	head_position = motion_p.getPosition('Head', 0, True)
 	r_arm_coor = point((coords, head_position), "./all_data/rbfweights.mat")
 
 	# if :
@@ -396,24 +419,9 @@ if __name__ == "__main__":
 		GazeNet = GazeNet.loadWeights("all_data/train_GazeFollow/binary_w.npz")
 
 		motion_p.wakeUp()
-		Speecher = SpeechRecognition("Speecher")
-		while True:
-			faceInfo = face_detection()
-			if faceInfo is not None:
-				center_face(faceInfo)
-				# if areyoumymom(Speecher):
-				break
-
-			# move head around until face is detected
-			time.sleep(0.5)
-			joint_list = ["HeadYaw", "HeadPitch"]
-			angle_list = [list(np.random.uniform(-0.8, 0.8, 1)), list(np.random.uniform(-0.6, 0.6, 1))]
-			times = [[1.25],[1.25]]
-
-			# if False: the angles are added to the current position, else they are calculated relative to the origin
-			motion_p.angleInterpolation(joint_list, angle_list, times, True)
-
 		cam = connect_new_cam()
+
+		find_face(cam)
 
 		follow_gaze(cam, GazeNet)
 
@@ -422,7 +430,7 @@ if __name__ == "__main__":
 			pp = pprint.PrettyPrinter(indent=4)
 			pp.pprint(circles)
 
-		posture_p.goToPosture("Sit", 0.7)
+		posture_p.goToPosture("Crouch", 0.7)
 		motion_p.rest()
 		broker.shutdown()
 	# except Exception , e:
