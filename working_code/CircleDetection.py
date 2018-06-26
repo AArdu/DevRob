@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from naoqi import ALBroker, ALProxy
 
-nao_ip = "192.168.1.104"
+nao_ip = "192.168.1.103"
 nao_port = 9559
 
 
