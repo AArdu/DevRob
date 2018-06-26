@@ -1,12 +1,15 @@
 %% create RBF with radians
 clear all 
 
+% Read in the data
 raw_data0 = jsondecode(fileread('./all_data/data.json'));
 raw_data1 = jsondecode(fileread('./all_data/data1.json'));
 
+% The coordinates of the hand position
 centres0 = [raw_data0.circles(:,:,1), raw_data0.circles(:,:,2)];
 centres1 = [raw_data1.circles(:,:,1), raw_data1.circles(:,:,2)];
 
+% The angles of the arm and head joints
 joints0 = zeros(length(raw_data0.joints), 4);
 joints1 = zeros(length(raw_data1.joints), 4);
 
@@ -25,11 +28,14 @@ end
 % append coords coming from different files
 joints_o = [joints0; joints1];
 
+% convert centres from coordinates to radians
 centres_o = [centres0; centres1];
 centres_o = [centres_o(:, 1) - 320, centres_o(:, 2) - 240];
 centres_o = [-(centres_o(:, 1)/640*60.97*pi/180), centres_o(:, 2)/480*47.64*pi/180];
+% correct the target position for the head position
 centres_o = [centres_o(:, 1) + joints_o(:, 1), centres_o(:, 2) + joints_o(:, 2)];
 
+% Inverse data to train both left and right arm
 neg_centres = [centres_o(:, 1) * -1, centres_o(:, 2)];
 neg_joints = [joints_o(:, 1) * -1, joints_o(:, 2), joints_o(:, 1) * -1, joints_o(:, 4)];
 
