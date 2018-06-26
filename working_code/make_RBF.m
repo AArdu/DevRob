@@ -20,7 +20,7 @@ centres_o = [centres0; centres1];
 
 neg_centres = [centres_o(:, 1) * -1, centres_o(:, 2)];
 neg_head_cart = [head_cart_o(:, 1:5), head_cart_o(:, end) * -1];
-neg_arm_cart = [arm_cart_o(:, 1), arm_cart_o(:, 2) * -1, arm_cart_o(:, 3:end)];
+neg_arm_cart = [arm_cart_o(:, 1), arm_cart_o(:, 2) * -1, arm_cart_o(:, 3) arm_cart_o(:, 4) * -1, arm_cart_o(:, 5:6)];
 
 centres = [centres_o; centres_o; neg_centres; neg_centres; centres_o; centres_o; neg_centres; neg_centres];
 arm_cart = [arm_cart_o; arm_cart_o; neg_arm_cart; neg_arm_cart; arm_cart_o; arm_cart_o; neg_arm_cart; neg_arm_cart];

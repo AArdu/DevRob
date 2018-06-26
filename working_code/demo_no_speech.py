@@ -8,48 +8,13 @@ import FaceDetection as FD
 import math
 from GazeFollow import GazeNet as GNet
 from rbfNew import point
+import matlab.engine as MATLAB
 
 
 nao_ip = "192.168.1.103"
 nao_port = 9559
 
 #motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p = None
-
-
-class SpeechRecognition(ALModule):
-	def __init__(self, name):
-		try:
-			p = ALProxy(name)
-			p.exit()
-		except:
-			pass
-		ALModule.__init__(self,name)
-		self.response = False
-		self.value = []
-		self.name = name
-		self.spr = ALProxy("ALSpeechRecognition")
-		self.spr.pause(True)
-
-
-	def getSpeech(self, wordlist, wordspotting):
-		self.response = False
-		self.value = []
-		self.spr.setVocabulary(wordlist, wordspotting)
-		self.spr.pause(False)
-		memory_p.subscribeToEvent("WordRecognized", self.name, "onDetect")
-
-	def onDetect(self, keyname, value, subsriber_name):
-		self.response = True
-		self.value = value
-		print(value)
-		memory_.unsubscribeToEvent("WordRecognized", self.name)
-		self.spr.pause(True)
-
-		if "abort" in self.value[0]:
-			self.response = False
-			memory_p.unsubscribeToEvent("WordRecognized", Speecher.name)
-			sys.exit(0)
-			return
 
 
 def areyoumymom(Speecher):
@@ -90,7 +55,7 @@ def find_face(camera):
 	if len(detect_face(camera)) > 0:
 		tts_p.say("I see a face.")
 	else:
-		tts_p("I thought I found your face but I seem to have lost it.")
+		tts_p.say("I thought I found your face but I seem to have lost it.")
 		find_face(camera)
 
 
@@ -177,7 +142,7 @@ def find_closest_object(cam):
 		return [closest_ball[0], closest_ball[1]]
 	else:
 		return None
-    
+
 
 def look_at_gazed(coords):
 	coords[0] = coords[0] - 320
@@ -195,9 +160,21 @@ def look_at_gazed(coords):
 
 
 def point_at_gazed(coords, cam):
-	head_position = motion_p.getPosition('Head', 0, True)
-	r_arm_coor = point((coords, head_position), "./all_data/rbfweights.mat")
+	print(coords)
+	if True:
+		head_pitch, head_yaw = motion_p.getAngles(["HeadPitch", "HeadYaw"], True)
+		p_in = [head_yaw -(coords[0]/640.*60.97*math.pi/180), head_pitch + coords[1]/480.*47.64*math.pi/180]
+		r_arm_ang = np.array(mat_eng.eval("sim(net, [{},{}].');".format(str(p_in[0]), str(p_in[1]))))
+		# r_arm_ang = point(p_in, "./all_data/rbfweights_angles.mat")
+		print(type(r_arm_ang[0]))
+		motion_p.angleInterpolation(["RElbowRoll"], 0.0349, 0.5, False)
+		motion_p.angleInterpolation(['RShoulderRoll', 'RShoulderPitch'], [r_arm_ang[0][0], r_arm_ang[1][0]], [1., 1.], False)
+	else:
+		head_position = motion_p.getPosition('Head', 0, True)
+		r_arm_coor = point(coords + head_position, "./all_data/rbfweights.mat")
 
+		motion_p.setPosition("RArm", 0, list(r_arm_coor[0]), 0.5, 7)
+	time.sleep(3)
 	# if :
 	# 	tts_p.say("I do not understand where you are looking")
 	# else:
@@ -401,7 +378,7 @@ if __name__ == "__main__":
 	# try:
 		try:
 			# create proxies
-			global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p
+			global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p, mat_eng
 			motion_p = ALProxy("ALMotion", nao_ip, nao_port)
 			posture_p = ALProxy("ALRobotPosture", nao_ip, nao_port)
 			face_det_p = ALProxy("ALFaceDetection", nao_ip, nao_port)
@@ -410,17 +387,19 @@ if __name__ == "__main__":
 			speech_rec_p = ALProxy("ALSpeechRecognition", nao_ip, nao_port)
 			video_p = ALProxy("ALVideoDevice", nao_ip, nao_port)
 			broker = ALBroker("broker", "0.0.0.0", 0, nao_ip, nao_port)
+			mat_eng = MATLAB.start_matlab()
 		except Exception, e:
 			print("Error while creating proxies:")
 			print(str(e))
 			sys.exit(0)
-		# matlab = subprocess.Popen(["C:\\Users\\univeristy\\Anaconda3\\python.exe", "py64environment.py"])
 		GazeNet = GNet()
 		GazeNet = GazeNet.loadWeights("all_data/train_GazeFollow/binary_w.npz")
 
+		posture_p.goToPosture("Crouch", 0.7)
 		motion_p.wakeUp()
 		cam = connect_new_cam()
 
+		mat_eng.load("./all_data/new_rbf_angles.mat", nargout=0)
 		find_face(cam)
 
 		follow_gaze(cam, GazeNet)
