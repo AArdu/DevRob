@@ -48,7 +48,7 @@ max_err = max(max(y_pred_cart - y_true_cart'));
 sprintf("Error in %i trials: \n Mean = %f \n Max = %f ",length(id), mean_err, max_err)
 
 %% save rbf and get weights
-save("./all_data/new_fbf.mat")
+save("./all_data/new_rbf.mat")
 
 biases = net.b();
 biases1 = biases(1);
