@@ -27,7 +27,12 @@ def find_face(camera):
     Moves the head of the NAO to until it finds a face in its
     visual field, then it centers the detected face.
     """
+    tts_p.say("I will now start looking for your face.")
     center_of_face = []
+    where_are_you = ["I can't detect your face, you should consider looking straight at me",
+                    "This is not a hide and seek demo, please make your face visible",
+                    "Where are you?"]
+    start_time = time.time()
     while len(center_of_face) == 0:
         center_of_face = detect_face(camera)
         if len(center_of_face) > 0:
@@ -35,11 +40,13 @@ def find_face(camera):
         else:
             # when no face is on sight, move the head randomly
             move_head_randomly()
+            if int(time.time() - start_time) % 6 == 0:
+                tts_p.say(where_are_you[np.random.randint(0, 3)])
             time.sleep(0.5)
     if len(detect_face(camera)) > 0:
         tts_p.say("I see a face.")
     else:
-        tts_p.say("I thought I found your face but I seem to have lost it.")
+        tts_p.say(where_are_you[np.random.randint(0, 3)])
         find_face(camera)
 
 
@@ -84,14 +91,18 @@ def follow_gaze(cam, GazeNet):
     center_of_face = []
     while len(center_of_face) == 0:
         img = get_remote_image(cam)
+
         fd = FD.FaceDetector(img, True)
         center_of_face = fd.detectCenterFaces()
+        back_to_face = motion_p.getAngles(["HeadYaw", "HeadPitch"], True)
         if len(center_of_face) > 0:
+            tts_p.say("I am now trying to follow your gaze.")
+
             # get gaze directions
             gaze_coords = GazeNet.getGaze(center_of_face, img)
             cv2.circle(img, (gaze_coords[0], gaze_coords[1]), 10, (0, 0, 255))
             cv2.imshow("Image", img)
-            cv2.waitKey(0)
+            cv2.waitKey(2000)
             cv2.destroyAllWindows()
             # use gaze directions to look and point in that direction
 
@@ -102,7 +113,7 @@ def follow_gaze(cam, GazeNet):
             # detect object
             closest_ball = find_closest_object(cam)
             if closest_ball is None:
-                center_face(center_of_face)
+                motion_p.angleInterpolation(["HeadYaw", "HeadPitch"], back_to_face, [1.0, 1.0], True)
                 print("I don't see what you are looking at")
                 tts_p.say("I don't see what you are looking at")
             # if detected:
@@ -110,7 +121,20 @@ def follow_gaze(cam, GazeNet):
 				# look in the direction of the gaze
                 look_at_gazed(closest_ball)
 				# point at the object if it's there
-                point_at_gazed(gaze_coords, cam)
+                point_at_gazed(closest_ball, cam)
+
+                # check if the ball is still there
+                checking_ball = find_closest_object(cam)
+                if checking_ball is None or (abs(checking_ball[0] - 320) > 25 and abs(checking_ball[1] - 240) > 25):
+                    tts_p.say("I pointed at the correct ball!")
+                    posture_p.goToPosture("Crouch", 0.5)
+                else:
+                    tts_p.say(" I pointed at the wrong ball.")
+                    posture_p.goToPosture("Crouch", 0.5)
+                    motion_p.angleInterpolation(["HeadYaw", "HeadPitch"], back_to_face, [1.0, 1.0], True)
+
+
+
 
 
 def find_closest_object(cam):
@@ -162,6 +186,7 @@ def look_at_gazed(coords):
     min_pitch = -0.6720 - current_head_pitch
     motion_p.angleInterpolation(["HeadYaw", "HeadPitch"], [max(min_yaw, min(
         max_yaw, x_angle)), max(min_pitch, min(max_pitch, y_angle))], [1.5, 1.5], False)
+    time.sleep(1.5)
 
 
 def point_at_gazed(coords, cam):
@@ -174,14 +199,21 @@ def point_at_gazed(coords, cam):
             head_pitch + coords[1] / 480. * 47.64 * math.pi / 180]
 
     # get joint angles from RBF using the matlab engine
-    r_arm_ang = np.array(mat_eng.eval(
+    arm_ang = np.array(mat_eng.eval(
         "sim(net, [{},{}].');".format(str(p_in[0]), str(p_in[1]))))
-    [elbow, sh_roll, sh_pitch] = choose_arm()
+
+
+    [elbow, sh_roll, sh_pitch, sh_roll_limits] = choose_arm()
+    sh_pitch_limits = [2.0857, -2.0857]
+
+    sh_angles = [max(sh_roll_limits[1], min(sh_roll_limits[0], arm_ang[0][0])), max(sh_pitch_limits[1], min(sh_pitch_limits[0], arm_ang[1][0]))]
 
     # extend elbow only after the hand is far from the body to avoid collisions
     motion_p.angleInterpolation(
-        [sh_roll, sh_pitch], [r_arm_ang[0][0], r_arm_ang[1][0]], [1., 1.], True)
+        [sh_roll, sh_pitch], sh_angles, [1., 1.], True)
     motion_p.angleInterpolation([elbow], 0.0349, 0.5, True)
+    tts_p.say("Were you looking in the direction I am pointing?")
+    tts_p.say("Remove the ball from this position if the direction is correct.")
     time.sleep(3)
 
 
@@ -193,9 +225,9 @@ def choose_arm():
     # wait until the head has reached the final position
     time.sleep(1)
     if (motion_p.getAngles('HeadYaw', False) > 0):
-        return ["LElbowRoll", "LShoulderRoll", "LShoulderPitch"]
+        return ["LElbowRoll", "LShoulderRoll", "LShoulderPitch", [1.3265, -0.3142]]
     else:
-        return ["RElbowRoll", "RShoulderRoll", "RShoulderPitch"]
+        return ["RElbowRoll", "RShoulderRoll", "RShoulderPitch", [0.3142, -1.3265]]
 
 
 def connect_new_cam(
@@ -268,11 +300,13 @@ def get_hough_circle(img):
 
     else:
         cv2.imshow("Detected circles", cimg)
-        cv2.waitKey(1)
+        cv2.waitKey(2000)
+        cv2.destroyAllWindows()
         return None
 
     cv2.imshow("Detected circles", cimg)
-    cv2.waitKey(0)
+    cv2.waitKey(2000)
+    cv2.destroyAllWindows()
     return circ_dict
 
 
@@ -290,7 +324,7 @@ def find_circles(cam):
         find_circles(cam)
     image = cimg.copy()
     detected_circles = get_hough_circle(image)
-    if detected_circles is None:
+    if detected_circles is None or detected_circles['radii'][0] == [0]:
         print("No circles found")
         return None
     print("\nPassing the following detected circles \n{}".format(detected_circles))
@@ -301,12 +335,13 @@ if __name__ == "__main__":
 
     try:
         # create proxies
-        global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p, mat_eng
+        global motion_p, posture_p, face_det_p, memory_p, tts_p, speech_rec_p, video_p, mat_eng#, ReactToTouch
         motion_p = ALProxy("ALMotion", nao_ip, nao_port)
         posture_p = ALProxy("ALRobotPosture", nao_ip, nao_port)
         face_det_p = ALProxy("ALFaceDetection", nao_ip, nao_port)
         memory_p = ALProxy("ALMemory", nao_ip, nao_port)
         tts_p = ALProxy("ALTextToSpeech", nao_ip, nao_port)
+        anim_speech = ALProxy("ALAnimatedSpeech", nao_ip, nao_port)
         speech_rec_p = ALProxy("ALSpeechRecognition", nao_ip, nao_port)
         video_p = ALProxy("ALVideoDevice", nao_ip, nao_port)
         broker = ALBroker("broker", "0.0.0.0", 0, nao_ip, nao_port)
@@ -323,17 +358,29 @@ if __name__ == "__main__":
     # start the Matlab engine used in the point_at_gazed function
     mat_eng.load("./all_data/new_rbf_angles.mat", nargout=0)
 
-    posture_p.goToPosture("Crouch", 0.7)
+    posture_p.goToPosture("Crouch", 0.5)
+
     motion_p.wakeUp()
     cam = connect_new_cam()
 
-    # start the demo with finding the face of the caregiver
-    find_face(cam)
+    anim_speech.say("Hello everyone! Welcome to this demonstration developed by Team Piaj   et. " \
+    "Please sit in front of my camera, so that I won't spend too much time searching for your face.", 2)
+    posture_p.goToPosture("Crouch", 0.5)
 
-    # once the face is found, follow the gaze and point
-    follow_gaze(cam, GazeNet)
+    try:
+        for i in range(5):
+            tts_p.say("This is trial number {}".format(str(i + 1)))
+            # start the demo with finding the face of the caregiver
+            find_face(cam)
+
+            # once the face is found, follow the gaze and point
+            follow_gaze(cam, GazeNet)
+            cv2.destroyAllWindows()
+    except KeyboardInterrupt:
+        posture_p.goToPosture("Crouch", 0.7)
 
     # at the end of the demo, go back to a resting position and shitdown the broker
+    tts_p.say("The demonstration has come to an end. Thank you for your attention.")
     posture_p.goToPosture("Crouch", 0.7)
     motion_p.rest()
     broker.shutdown()
