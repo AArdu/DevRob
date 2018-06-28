@@ -10,7 +10,7 @@
 * scipy
 * skimage
 
-## Usage:
+## Start the demo:
 Open a terminal in the master directory and run:
 ```
 python demo_no_speech.py
