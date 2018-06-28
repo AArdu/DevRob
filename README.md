@@ -1,4 +1,4 @@
-# Developed on Python 2.7 (Anaconda3) and Matlab R2017a
+### Developed on Python 2.7 (Anaconda3) and Matlab R2017a
 ## Dependencies to install:
 * Naoqi
 * Numpy
