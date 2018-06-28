@@ -99,7 +99,13 @@ def follow_gaze(cam, GazeNet):
             tts_p.say("I am now trying to follow your gaze.")
 
             # get gaze directions
-            gaze_coords = GazeNet.getGaze(center_of_face, img)
+            try:
+                gaze_coords = GazeNet.getGaze(center_of_face, img)
+            except:
+                tts_p.say("I could not predict your gaze")
+                print("Error in GazeNet: probably prediction outside image.")
+                center_of_face = []
+
             cv2.circle(img, (gaze_coords[0], gaze_coords[1]), 10, (0, 0, 255))
             cv2.imshow("Image", img)
             cv2.waitKey(2000)
@@ -125,7 +131,7 @@ def follow_gaze(cam, GazeNet):
 
                 # check if the ball is still there
                 checking_ball = find_closest_object(cam)
-                if checking_ball is None or (abs(checking_ball[0] - 320) > 25 and abs(checking_ball[1] - 240) > 25):
+                if checking_ball is None or (abs(checking_ball[0] - 320) > 40 and abs(checking_ball[1] - 240) > 40):
                     tts_p.say("I pointed at the correct ball!")
                     posture_p.goToPosture("Crouch", 0.5)
                 else:
@@ -226,7 +232,7 @@ def choose_arm():
     time.sleep(1)
     if (motion_p.getAngles('HeadYaw', False) > 0):
         return ["LElbowRoll", "LShoulderRoll", "LShoulderPitch", [1.3265, -0.3142]]
-    else:
+    elif(motion_p.getAngles('HeadYaw', False) <= 0):
         return ["RElbowRoll", "RShoulderRoll", "RShoulderPitch", [0.3142, -1.3265]]
 
 
@@ -363,9 +369,9 @@ if __name__ == "__main__":
     motion_p.wakeUp()
     cam = connect_new_cam()
 
-    anim_speech.say("Hello everyone! Welcome to this demonstration developed by Team Piaj   et. " \
-    "Please sit in front of my camera, so that I won't spend too much time searching for your face.", 2)
-    posture_p.goToPosture("Crouch", 0.5)
+    # anim_speech.say("Hello everyone! Welcome to this demonstration developed by Team Piaj   et. " \
+    # "Please sit in front of my camera, so that I won't spend too much time searching for your face.", 2)
+    # posture_p.goToPosture("Crouch", 0.5)
 
     try:
         for i in range(5):
